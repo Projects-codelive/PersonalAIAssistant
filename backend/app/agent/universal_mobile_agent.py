@@ -328,7 +328,7 @@ class UniversalMobileAgent:
         logger.info(f"Universal YouTube: Smartly routing song to YouTube: '{clean_q}'")
         if dev:
             # Direct intent to launch search immediately
-            dev.shell(f'am start -a android.intent.action.SEARCH -e query "{clean_q}" com.google.android.youtube')
+            dev.shell(["am", "start", "-a", "android.intent.action.SEARCH", "-e", "query", clean_q, "com.google.android.youtube"])
             time.sleep(2.5)
 
             # Dump hierarchy to find the first organic video card

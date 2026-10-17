@@ -70,3 +70,9 @@ screenshots/
 client/screenshots/
 *.png
 
+# AgentTool secrets & personal data
+backend/.agenttool_token
+backend/builtin_contacts.json
+
+# One-command dev runner state (logs, install stamps)
+.dev/

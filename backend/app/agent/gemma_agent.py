@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
@@ -11,6 +12,45 @@ from app.agent.tools import (
 from app.db.mongo import save_conversation_turn
 
 logger = logging.getLogger(__name__)
+
+# Pending calls/messages expire so a stray "yes" long after the question can never fire them
+PENDING_ACTION_TTL_SECONDS = 120
+
+
+class ExpiringDict(dict):
+    """dict whose entries silently disappear `ttl` seconds after they were last set"""
+
+    def __init__(self, ttl: float):
+        super().__init__()
+        self.ttl = ttl
+        self._set_at: Dict[Any, float] = {}
+
+    def __setitem__(self, key, value):
+        self._set_at[key] = time.monotonic()
+        super().__setitem__(key, value)
+
+    def _expire(self, key):
+        if dict.__contains__(self, key) and time.monotonic() - self._set_at.get(key, 0) > self.ttl:
+            logger.info(f"Pending action for session '{key}' expired after {self.ttl}s")
+            dict.pop(self, key, None)
+            self._set_at.pop(key, None)
+
+    def __contains__(self, key):
+        self._expire(key)
+        return super().__contains__(key)
+
+    def __getitem__(self, key):
+        self._expire(key)
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        self._expire(key)
+        return super().get(key, default)
+
+    def pop(self, key, *default):
+        self._expire(key)
+        self._set_at.pop(key, None)
+        return super().pop(key, *default)
 
 SYSTEM_PROMPT = """You are AgentTool, an autonomous mobile AI assistant powered by local Gemma.
 You are running locally on the device with zero cloud API key requirements.
@@ -57,9 +97,9 @@ class GemmaMobileAgent:
         self.tools_map = {t.name: t for t in ALL_TOOLS}
         self.llm_with_tools = None
         # In-memory pending confirmations keyed by session_id
-        self.pending_confirmations: Dict[str, Dict[str, Any]] = {}
+        self.pending_confirmations: Dict[str, Dict[str, Any]] = ExpiringDict(PENDING_ACTION_TTL_SECONDS)
         # In-memory conversational slot filling (missing parameters) keyed by session_id
-        self.pending_inputs: Dict[str, Dict[str, Any]] = {}
+        self.pending_inputs: Dict[str, Dict[str, Any]] = ExpiringDict(PENDING_ACTION_TTL_SECONDS)
         
         if self.llm:
             try:
@@ -580,7 +620,9 @@ Multilingual Instructions:
 
             if waiting == "fuzzy_contact_confirm":
                 self.pending_inputs.pop(session_id, None)
-                if re.search(r"\b(yes|yeah|yep|yup|sure|ok|okay|please|confirm|do it|proceed|haan|ha|haanji|hanji|theek hai|thik hai|sahi hai|bilkul|zaroor|chalo|pakka|karo|bhejo|lagao|si|sí|claro|correct|right)\b", msg):
+                # Check refusals first: "mat karo" / "don't" contain yes-words like "karo"
+                is_refusal = re.search(r"\b(no|nope|nah|cancel|stop|abort|don't|do not|wrong|galat|nahi|nahin|mat|mat karo|mat bhejo|roko|rehne do)\b", msg)
+                if not is_refusal and re.search(r"\b(yes|yeah|yep|yup|sure|ok|okay|confirm|do it|proceed|haan|ha|haanji|hanji|theek hai|thik hai|sahi hai|bilkul|zaroor|chalo|pakka|karo|bhejo|lagao|si|sí|claro|correct|right)\b", msg):
                     resolved = p_input["resolved"]
                     resolved.pop("needs_fuzzy_confirmation", None)
                     resolved.pop("original_query", None)
@@ -836,7 +878,14 @@ Multilingual Instructions:
         # 0.5 Multi-Turn Conversation Coreference & Context Resolution
         # ---------------------------------------------------------
         from app.agent.conversation_memory import conversation_manager
-        coref = conversation_manager.resolve_coreference(session_id, user_message)
+        # A short "yes call him" / "ok send it" answers the pending question: don't re-route it via its pronoun
+        is_short_confirmation = (
+            session_id in self.pending_confirmations
+            and len(msg.split()) <= 3
+            and re.search(r"\b(yes|yeah|yep|ok|okay|sure|haan|ha|haanji|confirm|go ahead|do it|si|sí)\b", msg)
+            and not re.search(r"\b(no|not|don't|nahi|mat|actually|instead|change)\b", msg)
+        )
+        coref = {} if is_short_confirmation else conversation_manager.resolve_coreference(session_id, user_message)
 
         # Handle message modification: "change message to...", "actually say..."
         if coref.get("is_message_modification"):
@@ -982,11 +1031,19 @@ Multilingual Instructions:
             ))
             # 2. Detect affirmative response (English, Hindi, Hinglish, Spanish)
             is_affirmative = bool(re.search(
-                r"\b(yes|yeah|yep|yup|sure|ok|okay|proceed|please|confirm|go ahead|do it|haan|ha|haanji|hanji|bhej do|kar do|kardo|theek hai|thik hai|sahi hai|bilkul|zaroor|chalo|pakka|call karo|call lagao|send it|si|sí|claro|dale|adelante)\b",
+                r"\b(yes|yeah|yep|yup|sure|ok|okay|proceed|confirm|go ahead|do it|haan|ha|haanji|hanji|bhej do|kar do|kardo|theek hai|thik hai|sahi hai|bilkul|zaroor|chalo|pakka|call karo|call lagao|send it|si|sí|claro|dale|adelante)\b",
                 msg
             )) or (msg.strip() in ["bhejo", "karo", "call", "dial", "send", "haan", "ha"] and not is_negative)
+            # "ok, actually call Mom instead" is a correction, not a confirmation of the old action
+            is_correction = bool(re.search(r"\b(actually|instead|rather|wait|change|not\s+that|balki|nahi\s+balki|en\s+vez)\b", msg))
+            is_new_command = bool(re.search(r"\b(?:call|dial|phone|whatsapp|sms|text|message|email|mail|search|save|open|llama|llamar|manda|mandar|envia|enviar|lagao|bhejo)\b", msg, re.IGNORECASE))
+            # A long reply that also contains a command verb is ambiguous: re-ask instead of guessing
+            is_ambiguous_confirm = is_affirmative and is_new_command and len(msg.split()) > 3
 
-            if is_affirmative and not is_negative:
+            if is_correction:
+                self.pending_confirmations.pop(session_id, None)
+                logger.info(f"Discarded pending {channel} for session '{session_id}': user issued a correction")
+            elif is_affirmative and not is_negative and not is_ambiguous_confirm:
                 # User confirmed! Execute the pending action
                 self.pending_confirmations.pop(session_id, None)
                 action = pending["action"]
@@ -1026,9 +1083,8 @@ Multilingual Instructions:
                 }
 
             else:
-                # User gave neither affirmative nor negative: check if user entered a completely new command
-                is_new_command = bool(re.search(r"\b(?:call|dial|phone|whatsapp|sms|text|message|email|mail|search|save|open|llama|llamar|manda|mandar|envia|enviar|lagao|bhejo)\b", msg, re.IGNORECASE))
-                if is_new_command:
+                # User gave neither a clear yes nor no: a new command discards the stale confirmation
+                if is_new_command and not is_ambiguous_confirm:
                     # Discard stale pending confirmation and proceed to parse the new command
                     self.pending_confirmations.pop(session_id, None)
                 else:

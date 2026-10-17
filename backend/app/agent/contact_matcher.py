@@ -1,9 +1,29 @@
+import os
 import re
+import json
 import difflib
 import logging
+from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
+
+# Personal fallback contacts live outside source control (git-ignored JSON list of
+# {"name", "phone", "email", "has_phone", "has_whatsapp", "has_email"} objects)
+BUILTIN_CONTACTS_FILE = Path(os.getenv(
+    "BUILTIN_CONTACTS_FILE",
+    Path(__file__).resolve().parents[2] / "builtin_contacts.json"
+))
+
+
+def load_builtin_contacts() -> List[Dict[str, Any]]:
+    if not BUILTIN_CONTACTS_FILE.exists():
+        return []
+    try:
+        return json.loads(BUILTIN_CONTACTS_FILE.read_text())
+    except Exception as e:
+        logger.warning(f"Could not read builtin contacts from {BUILTIN_CONTACTS_FILE}: {e}")
+        return []
 
 class ContactMatcher:
     """
@@ -191,11 +211,7 @@ class ContactMatcher:
             logger.debug(f"Error reading ADB contacts in ContactMatcher: {e}")
 
         # 3. Builtin contacts fallback (e.g. offline testing or when ADB not connected)
-        builtin_contacts = [
-            {"name": "Abhishek", "phone": "+917208590785", "has_phone": True, "has_whatsapp": True},
-            {"name": "Shyam (You)", "phone": "+919167078537", "email": "sg25042023@gmail.com", "has_phone": True, "has_whatsapp": True, "has_email": True}
-        ]
-        for c in builtin_contacts:
+        for c in load_builtin_contacts():
             key = c["name"].lower()
             if key not in unified:
                 unified[key] = dict(c)

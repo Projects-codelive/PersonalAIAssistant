@@ -92,6 +92,9 @@ if __name__ == "__main__":
     print(f" • MongoDB Connection:      {settings.MONGODB_URI}")
     print(f" • Gemma LLM Provider:      {settings.GEMMA_PROVIDER} ({settings.GEMMA_MODEL_NAME})")
     print(f" • ElevenLabs Voice:        {'Configured' if settings.ELEVENLABS_API_KEY else 'Browser Voice Fallback'}")
+    print(f" • API Auth:                localhost & USB phone trusted; Wi-Fi/LAN clients need the token")
+    print(f" • Wi-Fi Pairing Link:      {protocol}://{local_ip}:{port}/?token={settings.API_TOKEN}")
+    print(f" • Wi-Fi Android App URL:   ws://{local_ip}:{port}/ws/device/agent-mobile?token={settings.API_TOKEN}")
     # Auto configure ADB reverse port for USB-connected Android phone
     try:
         import subprocess

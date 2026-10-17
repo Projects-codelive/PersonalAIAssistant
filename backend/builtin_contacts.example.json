@@ -1,0 +1,10 @@
+[
+  {
+    "name": "Alice Johnson",
+    "phone": "+15550192834",
+    "email": "alice@example.com",
+    "has_phone": true,
+    "has_whatsapp": true,
+    "has_email": true
+  }
+]

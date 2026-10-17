@@ -298,6 +298,8 @@ class MainActivity : AppCompatActivity(), DeviceWebSocketClient.EventListener {
             "http://127.0.0.1:8000"
         }
         val endpoint = "$httpBase/api/search"
+        // Wi-Fi connections authenticate with ?token=... on the WebSocket URL; reuse it for HTTP calls
+        val apiToken = Uri.parse(wsUrl).getQueryParameter("token").orEmpty()
 
         layoutSearchResult.visibility = View.VISIBLE
         tvToolSiteStatus.text = "🛠️ Calling knowledge tool (Source: $sourceKey)..."
@@ -321,6 +323,7 @@ class MainActivity : AppCompatActivity(), DeviceWebSocketClient.EventListener {
         val request = Request.Builder()
             .url(endpoint)
             .post(requestBody)
+            .apply { if (apiToken.isNotEmpty()) header("X-AgentTool-Token", apiToken) }
             .build()
 
         client.newCall(request).enqueue(object : Callback {

@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Optional, Dict, Any, List
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response, JSONResponse
@@ -20,6 +20,7 @@ from app.agent.gemma_agent import agent
 from app.agent.agent_worker import agent_worker
 from app.voice.elevenlabs_service import voice_service
 from app.device.device_bridge import device_bridge
+from app.security import TokenAuthMiddleware
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("agenttool")
@@ -45,19 +46,25 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS configuration for mobile and local network access
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Token auth on /api and /ws (localhost + USB phone trusted, LAN needs the token)
+app.add_middleware(TokenAuthMiddleware)
+
+# CORS: the bundled client is same-origin, so only explicitly configured extra origins are allowed.
+# Added after auth so it is the outer layer and answers preflights for those origins.
+cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+if cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type", "X-AgentTool-Token"],
+    )
 
 # Request Models
 class ChatRequest(BaseModel):
     message: str
-    session_id: Optional[str] = "default"
+    session_id: Optional[str] = None
     voice_response: Optional[bool] = True
 
 class CallTriggerRequest(BaseModel):
@@ -82,8 +89,7 @@ async def get_system_status():
         "status": "online",
         "mongodb": {
             "connected": db.is_connected,
-            "database": settings.MONGODB_DB_NAME,
-            "uri": settings.MONGODB_URI
+            "database": settings.MONGODB_DB_NAME
         },
         "gemma": {
             "provider": settings.GEMMA_PROVIDER,
@@ -98,7 +104,7 @@ async def get_system_status():
     }
 
 @app.post("/api/chat")
-async def chat_endpoint(payload: ChatRequest):
+async def chat_endpoint(payload: ChatRequest, request: Request):
     """
     Main conversational agent endpoint.
     Processes user instruction (e.g. 'Call Alice' or 'Make a call to 911'),
@@ -107,6 +113,9 @@ async def chat_endpoint(payload: ChatRequest):
     user_msg = payload.message.strip()
     if not user_msg:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
+    if not payload.session_id or payload.session_id == "default":
+        # Never let different clients share one session: a "yes" from one would confirm another's action
+        payload.session_id = f"client_{request.client.host if request.client else 'unknown'}"
 
     logger.info(f"Received chat message: '{user_msg}' (Session: {payload.session_id})")
 

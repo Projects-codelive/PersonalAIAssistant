@@ -434,7 +434,7 @@ class ADBDeviceController:
             return True
         except Exception as e:
             # Fallback to shell monkey
-            dev.shell(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1")
+            dev.shell(["monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"])
             return True
 
     def open_url_in_browser(self, url: str) -> bool:
@@ -445,10 +445,8 @@ class ADBDeviceController:
         self.wake_screen()
         try:
             import time
-            safe_url = url.replace("&", "\\&")
-            cmd = f"am start -a android.intent.action.VIEW -d '{safe_url}' com.android.chrome"
-            logger.info(f"Opening URL in browser: {cmd}")
-            dev.shell(cmd)
+            logger.info(f"Opening URL in browser: {url}")
+            dev.shell(["am", "start", "-a", "android.intent.action.VIEW", "-d", url, "com.android.chrome"])
             # Give Chrome 1 second to initialize and press Enter to load URL if caught in omnibox/search suggestions
             time.sleep(1.2)
             dev.shell("input keyevent 66")
@@ -458,7 +456,7 @@ class ADBDeviceController:
             logger.error(f"Error opening URL in browser via ADB: {e}")
             try:
                 import time
-                dev.shell(f"am start -a android.intent.action.VIEW -d '{safe_url}'")
+                dev.shell(["am", "start", "-a", "android.intent.action.VIEW", "-d", url])
                 time.sleep(1.0)
                 dev.shell("input keyevent 66")
                 return True
@@ -518,7 +516,7 @@ class ADBDeviceController:
         }
         keycode = key_map.get(key.lower(), key)
         try:
-            dev.shell(f"input keyevent {keycode}")
+            dev.shell(["input", "keyevent", str(keycode)])
             return True
         except Exception as e:
             logger.error(f"Error sending keyevent {keycode} via ADB: {e}")
@@ -976,7 +974,7 @@ class ADBDeviceController:
         if not dev:
             return False
         try:
-            dev.shell(f"input swipe {x1} {y1} {x2} {y2} {duration_ms}")
+            dev.shell(["input", "swipe", *(str(int(v)) for v in (x1, y1, x2, y2, duration_ms))])
             return True
         except Exception as e:
             logger.error(f"ADB swipe error: {e}")
@@ -1007,9 +1005,8 @@ class ADBDeviceController:
             import urllib.parse
             import time
             clean_num = re.sub(r"[^\d+]", "", phone_number)
-            cmd = f'am start -a android.intent.action.SENDTO -d "smsto:{clean_num}" --es sms_body "{message}"'
             logger.info(f"Dispatching SMS intent via ADB to {clean_num}")
-            dev.shell(cmd)
+            dev.shell(["am", "start", "-a", "android.intent.action.SENDTO", "-d", f"smsto:{clean_num}", "--es", "sms_body", message])
             time.sleep(0.8)
             # True only if the Send button was found and tapped
             return self.click_send_button()
@@ -1030,9 +1027,8 @@ class ADBDeviceController:
             digits = re.sub(r"[^\d]", "", phone_number)
             encoded_text = urllib.parse.quote(message)
             # Use direct whatsapp protocol intent with explicit com.whatsapp package
-            intent_cmd = f'am start -a android.intent.action.VIEW -d "whatsapp://send?phone={digits}&text={encoded_text}" com.whatsapp'
             logger.info(f"Dispatching direct WhatsApp intent via ADB to {digits}")
-            dev.shell(intent_cmd)
+            dev.shell(["am", "start", "-a", "android.intent.action.VIEW", "-d", f"whatsapp://send?phone={digits}&text={encoded_text}", "com.whatsapp"])
             time.sleep(1.2)
             # True only if the Send button was found and tapped
             return self.click_send_button()
@@ -1055,11 +1051,10 @@ class ADBDeviceController:
             enc_subj = urllib.parse.quote(subj)
             enc_body = urllib.parse.quote(message)
 
-            # Format single-quoted URI with proper query string to prevent Android /bin/sh truncation at &
-            uri = f"mailto:{to_email}?subject={enc_subj}&body={enc_body}"
-            cmd = f"am start -a android.intent.action.SENDTO -d '{uri}' com.google.android.gm"
-            logger.info(f"Dispatching Email intent via ADB: {cmd}")
-            dev.shell(cmd)
+            # Recipient is URL-encoded and every argument is shell-quoted by adbutils (no /bin/sh injection)
+            uri = f"mailto:{urllib.parse.quote(to_email, safe='@.+-_')}?subject={enc_subj}&body={enc_body}"
+            logger.info(f"Dispatching Email intent via ADB: {uri}")
+            dev.shell(["am", "start", "-a", "android.intent.action.SENDTO", "-d", uri, "com.google.android.gm"])
             time.sleep(1.8)
 
             # On-screen verification: inspect screen hierarchy
@@ -1089,8 +1084,7 @@ class ADBDeviceController:
                 logger.info(f"Autonomously focusing subject field at ({cx}, {cy})...")
                 dev.shell(f"input tap {cx} {cy}")
                 time.sleep(0.3)
-                safe_subj = subj.replace(" ", "%s").replace("'", "\\'")
-                dev.shell(f"input text '{safe_subj}'")
+                dev.shell(["input", "text", subj.replace(" ", "%s")])
                 time.sleep(0.3)
 
             # If body was not filled by intent, focus body field and input text
@@ -1099,8 +1093,7 @@ class ADBDeviceController:
                 logger.info(f"Autonomously focusing body field at ({cx}, {cy})...")
                 dev.shell(f"input tap {cx} {cy}")
                 time.sleep(0.3)
-                safe_msg = message.replace(" ", "%s").replace("'", "\\'").replace("\n", "%s")
-                dev.shell(f"input text '{safe_msg}'")
+                dev.shell(["input", "text", message.replace(" ", "%s").replace("\n", "%s")])
                 time.sleep(0.3)
 
             # Pre-send verification: confirm both subject and content are populated before tapping send

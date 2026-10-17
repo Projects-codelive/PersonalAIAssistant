@@ -5,6 +5,27 @@
 const API_BASE = window.location.origin;
 const WS_PROTOCOL = window.location.protocol === "https:" ? "wss:" : "ws:";
 
+// API token pairing: open http://<PC_IP>:<port>/?token=XXXX once on a Wi-Fi device; it is remembered.
+// (Not needed on the PC itself or on a USB phone via adb reverse - those count as localhost.)
+const urlToken = new URLSearchParams(window.location.search).get("token");
+if (urlToken) {
+  localStorage.setItem("agenttool_api_token", urlToken);
+  history.replaceState(null, "", window.location.pathname);
+}
+const API_TOKEN = localStorage.getItem("agenttool_api_token") || "";
+if (API_TOKEN) {
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init = {}) => {
+    const url = typeof input === "string" ? input : input.url;
+    if (url.startsWith(API_BASE) || url.startsWith("/api/")) {
+      const headers = new Headers(init.headers || {});
+      headers.set("X-AgentTool-Token", API_TOKEN);
+      init = { ...init, headers };
+    }
+    return nativeFetch(input, init);
+  };
+}
+
 // Persist Device/Session ID across browser refreshes so conversation history is never lost
 let storedDeviceId = localStorage.getItem("agenttool_device_id");
 if (!storedDeviceId) {
@@ -76,7 +97,8 @@ function setupTabs() {
 // WebSocket Connection (Device Bridge)
 // ========================================================
 function setupWebSocket() {
-  const wsUrl = `${WS_PROTOCOL}//${window.location.host}/ws/device/${DEVICE_ID}`;
+  const tokenQuery = API_TOKEN ? `?token=${encodeURIComponent(API_TOKEN)}` : "";
+  const wsUrl = `${WS_PROTOCOL}//${window.location.host}/ws/device/${DEVICE_ID}${tokenQuery}`;
   try {
     socket = new WebSocket(wsUrl);
 
