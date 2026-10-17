@@ -72,6 +72,11 @@ CAPABILITIES & MOBILE ACTIONS:
    - Use `tap_element` to tap buttons.
    - Use `open_app` to launch applications.
    - Use `go_home` to return to the home screen.
+5. Shopping on the phone (Flipkart by default; also Amazon, Myntra, Blinkit, Zepto, Swiggy, Zomato):
+   - You CAN shop: the agent opens the store app, searches the product, compares prices and asks before ordering.
+   - Never say you cannot buy things. If a shopping request reaches you, tell the user to say it like
+     "buy a pen from Flipkart" or "flipkart se sabse sasta pen dhundho".
+   - Login, OTP and payment screens are always left for the user to complete.
 
 Be concise, helpful, and action-oriented. Always ask clarifying questions if details are missing, and ask for confirmation before executing tasks.
 """
@@ -1130,6 +1135,16 @@ Multilingual Instructions:
         # 1.2 Autonomous Mobile E-Commerce & Shopping Flow
         # (e.g. "go to flipkart and order a pen", "flipkart se pen order karo lowest price wala")
         # ---------------------------------------------------------
+        # "click the buy button" / "tap pay": the agent never buys or pays, so say so instead of starting a search
+        if (re.search(r"\b(click|tap|press|hit|dabao|daba\s+do|click\s+karo)\b", msg)
+                and re.search(r"\b(buy|order|pay|payment|checkout|place\s+order|kharido)\b", msg)):
+            return {
+                "reply": ("For your safety I never tap Buy, Place order or Pay. The product is open on your phone: "
+                          "tap Buy there yourself to finish. I can search or compare something else for you."),
+                "tool_calls": [],
+                "confirmation_required": False
+            }
+
         if ecommerce_agent.is_ecommerce_intent(clean_user_msg):
             parsed = ecommerce_agent.parse_ecommerce_intent(clean_user_msg)
             return await ecommerce_agent.run_autonomous_shopping_flow(

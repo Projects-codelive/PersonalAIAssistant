@@ -111,3 +111,28 @@ async def test_agent_reply_only_claims_sent_on_success(fake_phone, fake_bridge, 
     agent.pending_confirmations[session_id] = dict(pending)
     result = await agent.run_hybrid_intent_analysis("yes", session_id=session_id)
     assert result["reply"].startswith("Sent SMS")
+
+
+GOOGLE_MESSAGES_SEND = ("", "", "Compose:Draft:Send", True)          # Pixel's Google Messages (Compose UI)
+GOOGLE_MESSAGES_LABEL = ("", "Sending as Test with profile photo", "", False)
+
+
+async def test_sms_sent_with_google_messages_send_button(fake_phone, fake_bridge):
+    fake_phone.show(GOOGLE_MESSAGES_LABEL, GOOGLE_MESSAGES_SEND)
+    result = await send_sms.ainvoke(SMS_ARGS)
+    assert result.startswith("SUCCESS")
+    assert len(taps(fake_phone)) == 1
+
+
+@pytest.mark.parametrize("node, is_send", [
+    ({"id": "Compose:Draft:Send", "clickable": True}, True),
+    ({"desc": "Send encrypted message as Fitbit Test with profile photo"}, True),
+    ({"desc": "Send SMS"}, True),
+    ({"id": "com.whatsapp:id/send"}, True),
+    ({"id": "com.google.android.gm:id/send"}, True),
+    ({"desc": "Sending as Fitbit Test with profile photo"}, False),   # a label, not the button
+    ({"text": "Sender info"}, False),
+    ({"id": "com.app:id/sender_name"}, False),
+])
+def test_send_button_recognition(node, is_send):
+    assert adb_controller.is_send_button(node) is is_send

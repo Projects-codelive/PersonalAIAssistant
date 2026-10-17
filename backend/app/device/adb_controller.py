@@ -245,13 +245,38 @@ class ADBDeviceController:
             logger.error(f"Error taking ADB screenshot: {e}")
             return None
 
+    # The agent never buys or pays: taps on these are always refused (the user does them on the phone)
+    PURCHASE_BUTTON_PATTERN = re.compile(
+        r"\b(buy|place\s+order|order\s+now|pay|payment|checkout|proceed\s+to\s+(?:buy|pay|checkout)|confirm\s+order|"
+        r"complete\s+purchase|upi|cash\s+on\s+delivery)\b", re.IGNORECASE)
+
+    def is_purchase_button(self, label: str) -> bool:
+        return bool(self.PURCHASE_BUTTON_PATTERN.search(label or ""))
+
+    def open_link_in_app(self, url: str, package: str) -> bool:
+        """Open a web link inside a specific app (e.g. a store's own search URL in its app)"""
+        dev = self.get_connected_device()
+        if not dev:
+            return False
+        self.wake_screen()
+        try:
+            dev.shell(["am", "start", "-a", "android.intent.action.VIEW", "-d", url, package])
+            return True
+        except Exception as e:
+            logger.warning(f"Could not open {url} in {package}: {e}")
+            return False
+
     def click_element_by_text(self, target: str) -> bool:
         """
         Autonomous Agent Navigation:
         Inspects screen, finds element matching text/desc, and taps its center.
+        Never taps purchase / payment buttons.
         """
         dev = self.get_connected_device()
         if not dev:
+            return False
+        if self.is_purchase_button(target):
+            logger.warning(f"Refused to tap purchase/payment button '{target}': buying and paying stay with the user")
             return False
 
         elements = self.dump_screen_hierarchy()
@@ -1118,6 +1143,24 @@ class ADBDeviceController:
             logger.error(f"ADB Email error: {e}")
             return False
 
+    @staticmethod
+    def is_send_button(el: Dict[str, Any]) -> bool:
+        """Send buttons across SMS / WhatsApp / Gmail apps (ids and labels differ per app and version)"""
+        desc = (el.get("desc") or "").lower()
+        text = (el.get("text") or "").lower()
+        res_id = (el.get("id") or "").lower()
+        return (
+            desc == "send"
+            or desc.startswith("send ")          # "Send SMS", "Send message", "Send encrypted message as …" (Google Messages)
+            or "send message" in desc
+            or "send_button" in res_id
+            or "send_message_button" in res_id
+            or "send_fab" in res_id
+            or res_id.endswith(":id/send")      # WhatsApp, Gmail
+            or res_id.endswith(":send")         # "Compose:Draft:Send" (Google Messages)
+            or (text == "send" and el.get("clickable", False))
+        )
+
     def click_send_button(self) -> bool:
         """
         Inspects screen hierarchy and clicks the on-screen Send button (SMS, WhatsApp, or Gmail).
@@ -1134,17 +1177,7 @@ class ADBDeviceController:
                 text = el.get("text", "").lower()
                 res_id = el.get("id", "").lower()
 
-                if (
-                    desc == "send"
-                    or "send message" in desc
-                    or "send sms" in desc
-                    or "send_button" in res_id
-                    or "send_message_button" in res_id
-                    or "send_fab" in res_id
-                    or res_id.endswith(":id/send")
-                    or res_id == "com.whatsapp:id/send"
-                    or (text == "send" and el.get("clickable", False))
-                ):
+                if self.is_send_button(el):
                     cx, cy = el["center"]
                     logger.info(f"Found send button at ({cx}, {cy}), tapping...")
                     dev.shell(f"input tap {cx} {cy}")

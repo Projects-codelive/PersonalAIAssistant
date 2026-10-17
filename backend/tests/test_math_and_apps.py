@@ -73,3 +73,48 @@ async def test_questions_to_the_assistant_are_not_treated_as_messages(text, sess
     result = await agent.run_hybrid_intent_analysis(text, session_id=session_id)
     assert "Do you want to send a WhatsApp message, SMS, or Email" not in result.get("reply", "")
     assert agent.pending_inputs.get(session_id) is None
+
+
+@pytest.mark.parametrize("text, app, query", [
+    ("buy a pen", "flipkart", "pen"),                                   # no store named -> default store
+    ("buy a pen from flip kart", "flipkart", "pen"),                    # voice-typed store name
+    ("Buy a pen from Flipcart", "flipkart", "pen"),
+    ("order 2 notebooks", "flipkart", "notebooks"),
+    ("mujhe ek pen kharidna hai", "flipkart", "pen"),
+    ("amazone se charger mangwao", "amazon", "charger"),
+    ("flipkart se sabse sasta pen dhundho", "flipkart", "pen"),         # the help-menu example
+    ("फ्लिपकार्ट से पेन खरीदो", "flipkart", "पेन"),
+    ("मुझे एक पेन चाहिए", "flipkart", "पेन"),
+    ("buy a pen fron flipkart", "flipkart", "pen"),                     # typo of "from" (seen on WhatsApp)
+    ("buy a pen frm flip kart", "flipkart", "pen"),
+])
+def test_shopping_requests_are_recognised(text, app, query):
+    from app.agent.ecommerce_agent import ecommerce_agent
+    assert ecommerce_agent.is_ecommerce_intent(text)
+    parsed = ecommerce_agent.parse_ecommerce_intent(text)
+    assert (parsed["app"], parsed["query"]) == (app, query)
+
+
+@pytest.mark.parametrize("text", [
+    "order status", "where is my order", "book a cab", "call mom", "buy",
+    "send whatsapp to alice saying buy milk", "what should I buy?", "which pen should I buy",
+    "play a song", "search wikipedia for taj mahal",
+])
+def test_non_shopping_messages_are_not_hijacked(text):
+    from app.agent.ecommerce_agent import ecommerce_agent
+    assert not ecommerce_agent.is_ecommerce_intent(text)
+
+
+async def test_buy_a_pen_routes_to_the_shopping_flow(monkeypatch, session_id):
+    # End-to-end routing through the agent (the phone flow itself is replaced by a recorder)
+    from app.agent.ecommerce_agent import ecommerce_agent
+    from app.agent.gemma_agent import agent
+    calls = []
+
+    async def fake_flow(session_id, app_name, query, criteria):
+        calls.append((app_name, query))
+        return {"reply": "searching", "tool_calls": []}
+
+    monkeypatch.setattr(ecommerce_agent, "run_autonomous_shopping_flow", fake_flow)
+    await agent.run_hybrid_intent_analysis("buy a pen from flip kart", session_id=session_id)
+    assert calls == [("flipkart", "pen")]

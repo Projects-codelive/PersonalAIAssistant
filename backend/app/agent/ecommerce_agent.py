@@ -27,6 +27,35 @@ class AutonomousEcommerceAgent:
     """
 
     SUPPORTED_APPS = ["flipkart", "amazon", "myntra", "blinkit", "zepto", "swiggy", "zomato"]
+    DEFAULT_APP = "flipkart"
+    # Stores whose app opens its own web search URL (…/search?q=…) straight on the results page
+    SEARCH_LINK_APPS = {"flipkart", "amazon"}
+
+    # Spoken / typed variants of store names -> canonical name ("flip kart" from voice typing, typos, Hindi script)
+    STORE_ALIASES = {
+        r"flip\s*-?\s*k[ae]rt|flipcart|flpkart|filpkart|फ्लिपकार्ट": "flipkart",
+        r"amazone|amzon|amazon\.in|amzn|अमेज़न|अमेजन": "amazon",
+        r"myntraa|mintra|मिंत्रा": "myntra",
+        r"blink\s+it|blinkitt|ब्लिंकिट": "blinkit",
+        r"zeptoo|जेप्टो": "zepto",
+        r"swiggy\s+instamart|instamart|swigy|स्विगी": "swiggy",
+        r"zomatoo|zometo|ज़ोमैटो|जोमैटो": "zomato",
+    }
+    # "buy a pen" with no store named: shop on DEFAULT_APP, but only for clear purchase verbs and not
+    # when the sentence is really about something else (calls, messages, bookings, order status)
+    PURCHASE_VERBS = (r"\b(buy|purchase|order|kharido|kharid(?:na|ni)?|mangwao|mangao|mangwa\s+do|le\s+lo|lena\s+hai|chahiye)\b"
+                      r"|(?:खरीदो|खरीदना|खरीद|मंगवाओ|मंगाओ|ऑर्डर|आर्डर|चाहिए)")
+    NOT_SHOPPING = (r"\b(call|dial|phone|sms|whatsapp|message|text|email|mail|alarm|song|music|play|youtube|"
+                    r"ticket|tickets|cab|taxi|uber|ola|table|appointment|status|track|tracking|where\s+is\s+my|"
+                    # questions about shopping are for the assistant, not purchases ("what should I buy?")
+                    r"what|which|why|how|should|recommend|suggest|kya|kaunsa|kaun\s+sa)\b")
+
+    @classmethod
+    def normalize_store_names(cls, user_msg: str) -> str:
+        m = user_msg
+        for pattern, canonical in cls.STORE_ALIASES.items():
+            m = re.sub(pattern, canonical, m, flags=re.IGNORECASE)
+        return m
 
     FALLBACK_URLS = {
         "flipkart": "https://www.flipkart.com",
@@ -41,11 +70,19 @@ class AutonomousEcommerceAgent:
     @classmethod
     def is_ecommerce_intent(cls, user_msg: str) -> bool:
         """Detect whether user message is an e-commerce shopping or ordering instruction"""
-        m = user_msg.lower()
+        m = cls.normalize_store_names(user_msg).lower()
         has_app = any(app in m for app in cls.SUPPORTED_APPS)
-        has_action = bool(re.search(r"\b(order|buy|purchase|search|find|kharido|kharid|manga|mangwao|le\s+lo|lena\s+hai|book|dhundh|dhoondh)\b", m))
+        has_action = bool(re.search(r"\b(order|buy|purchase|search|find|kharido|kharid|manga|mangwao|le\s+lo|lena\s+hai|book|dhundh\w*|dhoondh\w*|dhund[oh]\w*|dhoond[oh]\w*)\b", m)
+                          or re.search(r"खरीद|मंगवा|मंगा|ऑर्डर|आर्डर|ढूंढ|ढूँढ", m))
         has_direct = bool(re.search(r"^(?:go\s+to|open|jao|jaao|kholo)\s+(?:flipkart|amazon|myntra|blinkit|zepto|swiggy|zomato)", m))
-        return (has_app and has_action) or (has_app and has_direct)
+        if (has_app and has_action) or (has_app and has_direct):
+            return True
+        # No store named: a plain purchase request ("buy a pen", "mujhe ek pen kharidna hai")
+        if not re.search(cls.PURCHASE_VERBS, m) or re.search(cls.NOT_SHOPPING, m):
+            return False
+        # extract_product_query falls back to "pen" when nothing is left, so check a product was really named
+        product = cls.extract_product_query(m)
+        return product != "pen" or bool(re.search(r"\bpens?\b", m))
 
     @classmethod
     def is_resumption_intent(cls, user_msg: str, session_id: str) -> bool:
@@ -75,13 +112,17 @@ class AutonomousEcommerceAgent:
         noise_words = [
             r"\b(?:go\s+to|open|jao|jaao|kholo)\b",
             r"\b(?:and|aur|then|fir|bhi)\b",
-            r"\b(?:se|pe|par|me|mein|on|in|from|using|to|for|with|at|having)\b",
+            r"\b(?:se|pe|par|me|mein|on|in|from|fron|frm|form|frome|using|to|for|with|at|having)\b",  # incl. "from" typos
             r"\b(?:bhai|yaar|please|zara|ek|kuch|na|do|kar\s+do|kar\s+do\s+na)\b",
-            r"\b(?:order|buy|purchase|kharido|kharid|manga|mangwao|dhoondh|dhoondo|dhundh|dhundo|book|le\s+lo|lena\s+hai|lana|lao|get|find|search)\b",
+            r"\b(?:order|buy|purchase|kharido|kharid|manga|mangwao|dhoondh|dhoondho|dhoondo|dhundh|dhundho|dhundo|book|le\s+lo|lena\s+hai|lana|lao|get|find|search)\b",
             r"\b(?:lowest|price|cost|cheapest|cheap|sasta|sasti|sabse\s+sasta|best|value|low|rate|wala|wali|rate\s+ka)\b",
             r"\b(?:a|an|the)\b",
             r"\b(?:ke|ko|ka|ki)\b",
-            r"\b(?:karo|karna\s+hai|kariye)\b"
+            r"\b(?:karo|karna\s+hai|kariye)\b",
+            r"\b(?:mujhe|mere\s+liye|kharidna|kharidni|chahiye|hai|i\s+want\s+to|i\s+need|want|need)\b",
+            # Hindi (Devanagari) connectors and purchase verbs
+            # (whole words only: Python's \b doesn't separate Devanagari, and "पे" must not eat "पेन")
+            r"(?<!\S)(?:खरीदो|खरीदना|खरीद|मंगवाओ|मंगाओ|ऑर्डर|आर्डर|चाहिए|करो|से|पे|पर|का|की|के|को|मुझे|एक|है|सबसे|सस्ता)(?!\S)"
         ]
         cleaned = m
         for pat in noise_words:
@@ -100,10 +141,10 @@ class AutonomousEcommerceAgent:
         Extract target app, product query, and comparison criteria from natural language:
         e.g. 'bhai flipkart se sabse sasta pen dhundh ke book kar do na yaar'
         """
-        m = user_msg.lower().strip()
+        m = cls.normalize_store_names(user_msg).lower().strip()
 
-        # 1. Target app
-        target_app = "flipkart"
+        # 1. Target app (default when none named)
+        target_app = cls.DEFAULT_APP
         for app in cls.SUPPORTED_APPS:
             if app in m:
                 target_app = app
@@ -117,7 +158,7 @@ class AutonomousEcommerceAgent:
             criteria = "lowest_price"
 
         # 3. Product query extraction
-        query = cls.extract_product_query(user_msg)
+        query = cls.extract_product_query(m)
 
         return {
             "app": target_app,
@@ -174,12 +215,20 @@ class AutonomousEcommerceAgent:
             is_installed = adb_controller.is_app_installed(app_name)
             if is_installed:
                 logger.info(f"Native app '{app_name}' is installed. Launching app...")
-                adb_controller.open_app(app_name)
                 app_mode = "NATIVE_APP"
                 status_msg = f"Opened the native {app_name.capitalize()} app."
-                time.sleep(2.0)
-                # Search inside native app
-                elements = adb_controller.dump_screen_hierarchy()
+                if app_name in cls.SEARCH_LINK_APPS:
+                    # The store's own search URL opens its results page inside the app in one step. Typing into
+                    # the search box is unreliable: store home screens animate constantly, which blocks the
+                    # accessibility dump needed to find the box.
+                    adb_controller.open_link_in_app(fallback_url, adb_controller.get_package_for_app_name(app_name))
+                    time.sleep(4.0)
+                    elements = []
+                else:
+                    adb_controller.open_app(app_name)
+                    time.sleep(2.0)
+                    elements = adb_controller.dump_screen_hierarchy()
+                # Search inside native app (stores without a search link)
                 for el in elements:
                     txt = (el.get("text") or "").lower()
                     desc = (el.get("desc") or "").lower()
@@ -188,11 +237,12 @@ class AutonomousEcommerceAgent:
                         cx, cy = el["center"]
                         adb_controller.click_at(cx, cy)
                         break
-                time.sleep(0.5)
-                adb_controller.input_text(query)
-                time.sleep(0.5)
-                adb_controller.press_key("search")
-                time.sleep(2.0)
+                if app_name not in cls.SEARCH_LINK_APPS:
+                    time.sleep(0.5)
+                    adb_controller.input_text(query)
+                    time.sleep(0.5)
+                    adb_controller.press_key("search")
+                    time.sleep(2.0)
             else:
                 logger.info(f"Native app '{app_name}' NOT installed. Intelligently opening mobile Chrome directly to {fallback_url}...")
                 adb_controller.open_url_in_browser(fallback_url)
@@ -304,98 +354,62 @@ class AutonomousEcommerceAgent:
                         "result": f"Opened product page. Verified with screenshot: {s2_path}"
                     })
 
-                    # Trigger purchase flow: Taps 'Buy at ₹...' / 'Buy Now'
-                    logger.info(f"Tapping Buy button on product page for {best_item.title} ({best_item.raw_price})...")
-                    elements_prod = adb_controller.dump_screen_hierarchy()
-                    btn_tapped = False
-                    for el in elements_prod:
-                        txt = (el.get("text") or "").lower()
-                        desc = (el.get("desc") or "").lower()
-                        comb = f"{txt} {desc}".strip()
-                        if any(k in comb for k in ["buy at", "buy now", "order now", "proceed to buy"]):
-                            cx, cy = el["center"]
-                            logger.info(f"Tapping order button '{comb}' at ({cx}, {cy})...")
-                            adb_controller.click_at(cx, cy)
-                            btn_tapped = True
-                            break
-                    if not btn_tapped:
-                        cx, cy = adb_controller.find_yellow_shopping_button()
-                        logger.info(f"Tapping yellow Buy button at visual coordinates ({cx}, {cy})...")
-                        adb_controller.click_at(cx, cy)
-
+                    # Hand over on the product page. The agent never taps Buy / Place order / Pay: buying and
+                    # paying always stay with the user.
+                    ckpt.current_stage = "HANDED_OVER"
                     task_checkpoint_manager.record_progress(
                         session_id=session_id,
-                        action=f"Tapped purchase button 'Buy at {best_item.raw_price}'",
-                        stage="PURCHASE_INITIATED"
+                        action=f"Opened '{best_item.title}' ({best_item.raw_price}) and handed over to the user",
+                        stage="COMPLETED",
+                        is_paused=False,
+                        next_step="User decides and taps Buy on the phone (the agent never buys or pays)."
                     )
-
-                    time.sleep(3.0)
-                    s3_path = str(SCREENSHOT_DIR / f"ecom_{ts}_step3_post_buy.png")
-                    adb_controller.save_screenshot(s3_path)
-                    screenshots_taken.append(s3_path)
-                    ckpt.screenshots.append(s3_path)
-
-                    # Inspect the screen after clicking Buy button
-                    elements_after_buy = adb_controller.dump_screen_hierarchy()
-                    guard = privacy_guard.evaluate_screen_elements(elements_after_buy)
-
-                    # Check keyboard visibility fallback for phone login bottom sheet
-                    if not guard.is_sensitive and adb_controller.is_keyboard_shown():
-                        guard = privacy_guard.PrivacyCheckResult(
-                            is_sensitive=True,
-                            guard_type="PHONE_NUMBER_LOGIN",
-                            message="Flipkart is asking for your mobile number to log in and complete your shopping. Please enter your mobile number on your phone screen, and inform me once done (say 'done' or 'continue') so I can move to the next step!",
-                            requires_user_action=True,
-                            matched_term="login_keyboard"
-                        )
-
-                    if guard.is_sensitive and guard.guard_type in ["PHONE_NUMBER_LOGIN", "OTP", "PASSWORD"]:
-                        ckpt.current_stage = "AWAITING_USER_ACTION"
-                        ckpt.last_error = f"{guard.guard_type}_REQUIRED"
-                        task_checkpoint_manager.record_progress(
-                            session_id=session_id,
-                            action=f"Encountered Flipkart login: {guard.guard_type}",
-                            stage="AWAITING_USER_ACTION",
-                            is_paused=True,
-                            stuck_reason="Flipkart is asking for your mobile number to log in and complete shopping.",
-                            next_step="Please enter your mobile number on your phone screen and inform me once done (say 'done' or 'continue')."
-                        )
-                        return {
-                            "reply": (
-                                f"I opened {app_name.capitalize()}, selected \"{best_item.title}\" for {best_item.raw_price}, and clicked 'Buy at {best_item.raw_price}'.\n\n"
-                                f"{guard.message}"
-                            ),
-                            "tool_calls": executed_tools,
-                            "screenshots": screenshots_taken,
-                            "confirmation_required": False
-                        }
-
-                    # If directly at Order Summary / Deliver Here:
-                    ckpt.current_stage = "AWAITING_ORDER_CONFIRMATION"
-                    task_checkpoint_manager.record_progress(
-                        session_id=session_id,
-                        action=f"Reached Order Summary for '{best_item.title}' ({best_item.raw_price})",
-                        stage="AWAITING_ORDER_CONFIRMATION",
-                        is_paused=True,
-                        stuck_reason="Waiting for final user pre-purchase confirmation.",
-                        next_step="Say 'yes' to place the order or 'no' to cancel."
-                    )
+                    task_checkpoint_manager.mark_completed(session_id)
+                    label = "Best value per piece" if criteria == "best_value" else "Cheapest"
+                    other = ecommerce_comparator.find_best_product(
+                        products, criteria="lowest_price" if criteria == "best_value" else "best_value")
+                    other_line = ""
+                    if other and other.title != best_item.title:
+                        other_label = "Cheapest" if criteria == "best_value" else "Best value per piece"
+                        other_line = (f"\n{other_label}: \"{other.title}\" at {other.raw_price}"
+                                      + (f" (pack of {other.pack_count}, about ₹{other.unit_price:.1f} each)" if other.pack_count > 1 else "")
+                                      + ".")
                     return {
                         "reply": (
-                            f"I opened {app_name.capitalize()}, selected \"{best_item.title}\" for {best_item.raw_price}, and clicked 'Buy at {best_item.raw_price}'.\n\n"
-                            f"We have reached the Order Summary. Do you want me to proceed with confirming and placing this order? Say 'yes' to proceed or 'no' to cancel."
+                            f"{status_msg}\n\nI searched '{query}' on {app_name.capitalize()} and compared {len(products)} results.\n"
+                            f"{label}: \"{best_item.title}\" at {best_item.raw_price}"
+                            + (f" (pack of {best_item.pack_count}, about ₹{best_item.unit_price:.1f} each)" if best_item.pack_count > 1 else "")
+                            + f".{other_line}\n\n"
+                            "I've opened it on your phone. I never place orders or make payments: if you want it, "
+                            "tap Buy on your phone and finish there."
                         ),
                         "tool_calls": executed_tools,
                         "screenshots": screenshots_taken,
-                        "confirmation_required": True,
-                        "pending_action": {
-                            "type": "ECOMMERCE_ORDER",
-                            "app": app_name,
-                            "item": ckpt.selected_item
-                        }
+                        "confirmation_required": False
                     }
 
-        # Simulated fallback if no device or mock
+        # A phone is connected but no product could be read from its screen (e.g. the store app's animations
+        # block the accessibility dump): say so honestly instead of inventing a result
+        if adb_controller.is_device_connected:
+            task_checkpoint_manager.record_progress(
+                session_id=session_id,
+                action=f"Searched '{query}' on {app_name} but could not read the product list from the screen",
+                stage="SEARCH_SHOWN",
+                is_paused=False,
+            )
+            task_checkpoint_manager.clear(session_id)
+            return {
+                "reply": (
+                    f"{status_msg}\n\nI searched for '{query}' on {app_name.capitalize()}, but I couldn't read the "
+                    "product list on the screen this time, so I haven't picked an item or started an order. "
+                    "The results are open on your phone: tap the one you like, or ask me to try again."
+                ),
+                "tool_calls": executed_tools,
+                "screenshots": screenshots_taken,
+                "confirmation_required": False,
+            }
+
+        # No phone connected: demo data so the flow can be shown without a device (clearly labelled as such)
         simulated_item = {
             "title": f"Cello Butterflow Blue Ball Pen (Pack of 5)",
             "price": "₹50",
@@ -412,10 +426,10 @@ class AutonomousEcommerceAgent:
         return {
             "reply": (
                 f"{status_msg}\n\n"
-                f"I searched for '{query}' on {app_name.capitalize()} and compared prices. "
-                f"The lowest price option is \"{simulated_item['title']}\" at {simulated_item['price']} (₹10/pen).\n\n"
-                "I have navigated to the product page on your device. Would you like me to proceed with ordering this item? "
-                "Please say 'yes' to confirm or 'no' to cancel."
+                "(Demo mode: no phone is connected, so this result is sample data.)\n\n"
+                f"Searching '{query}' on {app_name.capitalize()}, the lowest price option would be "
+                f"\"{simulated_item['title']}\" at {simulated_item['price']} (₹10/pen). "
+                "Say 'yes' to continue the demo or 'no' to cancel."
             ),
             "tool_calls": executed_tools,
             "screenshots": screenshots_taken,
@@ -529,78 +543,20 @@ class AutonomousEcommerceAgent:
                 "confirmation_required": False
             }
 
-        # User approved order placement!
-        ckpt.current_stage = "PROCEEDING_TO_PAYMENT"
+        # The agent never places orders or payments: a "yes" here (from an older pending order) only hands over
         task_checkpoint_manager.record_progress(
             session_id=session_id,
-            action=f"User approved order confirmation. Proceeding to finalize order for '{item.get('title')}'",
-            stage="PROCEEDING_TO_PAYMENT"
-        )
-        ts = int(time.time())
-        screenshots = list(getattr(ckpt, "screenshots", []))
-
-        # Taps 'Buy Now', 'Buy at ₹...', or 'Proceed to Checkout'
-        if adb_controller.is_device_connected:
-            elements = adb_controller.dump_screen_hierarchy()
-            btn_tapped = False
-            for el in elements:
-                txt = (el.get("text") or "").lower()
-                desc = (el.get("desc") or "").lower()
-                combined = f"{txt} {desc}".strip()
-                if any(k in combined for k in ["buy at", "buy now", "order now", "proceed to buy", "place order", "buy", "continue"]):
-                    cx, cy = el["center"]
-                    logger.info(f"Tapping order button '{combined}' at ({cx}, {cy})...")
-                    adb_controller.click_at(cx, cy)
-                    btn_tapped = True
-                    break
-            if not btn_tapped:
-                cx, cy = adb_controller.find_yellow_shopping_button()
-                logger.info(f"Tapping yellow purchase button at visual coordinates ({cx}, {cy})...")
-                adb_controller.click_at(cx, cy)
-
-            time.sleep(2.5)
-            s5_path = str(SCREENSHOT_DIR / f"ecom_{ts}_step5_order_confirmed.png")
-            adb_controller.save_screenshot(s5_path)
-            screenshots.append(s5_path)
-            ckpt.screenshots.append(s5_path)
-
-            elements_post = adb_controller.dump_screen_hierarchy()
-            guard = privacy_guard.evaluate_screen_elements(elements_post)
-            if guard.is_sensitive:
-                task_checkpoint_manager.record_progress(
-                    session_id=session_id,
-                    action=f"Order reached payment stage: {guard.guard_type}",
-                    stage="COMPLETED",
-                    is_paused=False,
-                    next_step="Complete confidential payment details on phone screen."
-                )
-                task_checkpoint_manager.mark_completed(session_id)
-                return {
-                    "reply": (
-                        f"Order Confirmed! I have proceeded with ordering \"{item.get('title')}\" for {item.get('price')}.\n\n"
-                        f"{guard.message}\n\nVisual verification screenshot saved to {s5_path}."
-                    ),
-                    "tool_calls": [{"tool": "proceed_to_checkout", "args": item, "result": "Reached secure payment stage."}],
-                    "screenshots": screenshots,
-                    "confirmation_required": False
-                }
-
-        task_checkpoint_manager.record_progress(
-            session_id=session_id,
-            action=f"Order Confirmed and placed successfully for '{item.get('title')}' ({item.get('price')})",
+            action=f"Handed over '{item.get('title')}' to the user (agent never buys or pays)",
             stage="COMPLETED",
             is_paused=False,
-            next_step="Order placed successfully! You can ask about this order anytime."
         )
         task_checkpoint_manager.mark_completed(session_id)
         return {
-            "reply": (
-                f"Order Confirmed! I navigated to the checkout screen for \"{item.get('title')}\" ({item.get('price')}). "
-                "For your security and privacy, please complete payment and verify delivery address on your phone."
-            ),
-            "tool_calls": [{"tool": "proceed_to_checkout", "args": item, "result": "Ready for final user payment."}],
-            "screenshots": screenshots,
+            "reply": (f"For your safety I never place orders or make payments. \"{item.get('title')}\" "
+                      f"({item.get('price')}) is open on your phone: tap Buy there if you want it."),
+            "tool_calls": [],
             "confirmation_required": False
         }
+
 
 ecommerce_agent = AutonomousEcommerceAgent()

@@ -51,6 +51,9 @@ async def tap_element(label_or_id: str) -> str:
 
     # 1. Physical Device via ADB
     if adb_controller.is_device_connected:
+        if adb_controller.is_purchase_button(label_or_id):
+            return (f"Refused to tap '{label_or_id}': I never buy or pay. "
+                    "Please tap it yourself on the phone if you want to continue.")
         success = adb_controller.click_element_by_text(label_or_id)
         if success:
             return f"Successfully clicked '{label_or_id}' on physical mobile phone screen via ADB."
