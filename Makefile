@@ -1,6 +1,6 @@
 # AgentTool developer commands (macOS / Linux). Windows: use build_apk.bat / launch_on_phone.bat.
 
-.PHONY: dev phone setup test stop whatsapp-status whatsapp-on whatsapp-off tunnel-stop help
+.PHONY: dev phone setup test stop landing whatsapp-status whatsapp-on whatsapp-off tunnel-stop help
 
 help:
 	@echo "make dev     Set up anything missing (venv, deps, MongoDB, model) and start the server"
@@ -8,6 +8,7 @@ help:
 	@echo "make setup   Set up only, don't start the server"
 	@echo "make test    Run the pytest suite (offline: never touches a phone, Ollama or MongoDB)"
 	@echo "make stop    Stop the MongoDB container"
+	@echo "make landing Open the project landing page (server must be running)"
 	@echo ""
 	@echo "WhatsApp:  make dev WHATSAPP=1   start with a public HTTPS tunnel for the webhook"
 	@echo "           make whatsapp-on      route the test number's messages to this machine"
@@ -42,3 +43,8 @@ whatsapp-off:
 
 tunnel-stop:
 	@./scripts/dev.sh --stop-tunnel
+
+landing:
+	@port=$$(for p in 8000 8765 8766 8767 8768 8769; do curl -sf -m 1 localhost:$$p/landing/ >/dev/null && echo $$p && break; done); \
+	if [ -n "$$port" ]; then echo "Landing page: http://localhost:$$port/landing/"; open "http://localhost:$$port/landing/" 2>/dev/null || true; \
+	else echo "Server not running: start it with 'make dev', then run 'make landing'"; fi

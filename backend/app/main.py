@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response, JSONResponse
+from fastapi.responses import FileResponse, Response, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
 from app.config import settings
@@ -420,6 +420,16 @@ async def download_apk():
 
 # WhatsApp Cloud API webhook (signature-verified; must be registered before the static "/" mount)
 app.include_router(whatsapp_router)
+
+# Project landing page at /landing/ (mounted before the catch-all "/" client mount)
+LANDING_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "landing"))
+if os.path.exists(LANDING_DIR):
+    @app.get("/landing", include_in_schema=False)
+    async def landing_redirect():
+        # "/landing" (no slash) would otherwise fall through to the client app and 404
+        return RedirectResponse(url="/landing/")
+
+    app.mount("/landing", StaticFiles(directory=LANDING_DIR, html=True), name="landing")
 
 # Mount the static client files
 CLIENT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "client"))
