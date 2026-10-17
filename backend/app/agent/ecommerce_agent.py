@@ -11,7 +11,7 @@ from app.agent.task_checkpoint_manager import task_checkpoint_manager, TaskCheck
 
 logger = logging.getLogger(__name__)
 
-SCREENSHOT_DIR = Path("s:/React/Automation/AgentTool/client/screenshots")
+SCREENSHOT_DIR = Path(__file__).resolve().parents[3] / "client" / "screenshots"
 SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
 class AutonomousEcommerceAgent:

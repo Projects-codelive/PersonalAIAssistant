@@ -13,9 +13,12 @@ class DeviceBridge:
         self.device_states: Dict[str, Dict[str, Any]] = {}
         # Pending action queues for devices
         self.pending_actions: Dict[str, asyncio.Queue] = {}
+        # Event loop that owns the device websockets (the server loop)
+        self._ws_loop: Optional[asyncio.AbstractEventLoop] = None
 
     async def connect(self, device_id: str, websocket: WebSocket):
         await websocket.accept()
+        self._ws_loop = asyncio.get_running_loop()
         self.active_connections[device_id] = websocket
         if device_id not in self.pending_actions:
             self.pending_actions[device_id] = asyncio.Queue()
@@ -36,6 +39,14 @@ class DeviceBridge:
 
     async def broadcast_action(self, action_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Send an action to all connected mobile devices (or the primary device)"""
+        # Websockets can only be used on the loop that accepted them; the agent worker runs on its own loop
+        ws_loop = self._ws_loop
+        if ws_loop is not None and ws_loop is not asyncio.get_running_loop():
+            future = asyncio.run_coroutine_threadsafe(self._broadcast(action_type, payload), ws_loop)
+            return await asyncio.wrap_future(future)
+        return await self._broadcast(action_type, payload)
+
+    async def _broadcast(self, action_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         event = {
             "type": action_type,
             "data": payload
@@ -45,13 +56,15 @@ class DeviceBridge:
             logger.warning("No mobile devices currently connected via WebSocket. Action queued for mobile web client.")
             return {"status": "dispatched_local", "recipients": 0, "event": event}
 
-        for dev_id, ws in self.active_connections.items():
+        delivered = 0
+        for dev_id, ws in list(self.active_connections.items()):
             try:
                 await ws.send_json(event)
+                delivered += 1
             except Exception as e:
                 logger.error(f"Failed to send event to device {dev_id}: {e}")
 
-        return {"status": "sent", "recipients": len(recipients), "event": event}
+        return {"status": "sent" if delivered else "failed", "recipients": delivered, "event": event}
 
     async def trigger_call(self, phone_number: str, contact_name: Optional[str] = None) -> Dict[str, Any]:
         """Trigger native phone dialer or call on connected mobile devices"""

@@ -57,27 +57,31 @@ async def make_phone_call(phone_number: str, contact_name: Optional[str] = None)
 
     logger.info(f"Opening mobile dialer for: {display_name} ({normalized_number})")
 
-    # 1. Open mobile dialer on USB connected phone and actively click call button
-    adb_dispatched = False
+    # Dispatch through exactly one path so a single confirmation never dials more than once:
+    # 1. USB phone via ADB: open the dialer and tap Call
     if adb_controller.is_device_connected:
-        adb_dispatched = adb_controller.open_mobile_dialer(normalized_number)
-        # Actively track mobile screen and tap the call button
-        adb_controller.click_call_button()
-        logger.info(f"Mobile dialer opened and call triggered via ADB: {adb_dispatched}")
+        if not adb_controller.open_mobile_dialer(normalized_number):
+            return f"FAILED: Could not open the dialer on your phone to call {display_name} at {normalized_number}."
+        call_tapped = adb_controller.click_call_button()
+        logger.info(f"Mobile dialer opened via ADB for {normalized_number}; call button tapped: {call_tapped}")
         # Asynchronously monitor when user cuts the call to reroute back to app
         import asyncio
         asyncio.create_task(adb_controller.watch_call_termination(normalized_number))
+        if call_tapped:
+            return f"SUCCESS: Phone call placed to {display_name} at {normalized_number}."
+        return (
+            f"NOT_CONFIRMED: Opened the dialer for {display_name} at {normalized_number}, but could not "
+            f"confirm the call started. Please tap Call on your phone."
+        )
 
-    # 2. Dispatch real-time action to mobile phone / client via WebSocket bridge
+    # 2. Otherwise hand the call to the connected AgentTool app / web client over WebSocket
     bridge_result = await device_bridge.trigger_call(
         phone_number=normalized_number,
         contact_name=display_name
     )
-
-    return (
-        f"SUCCESS: Phone call initiated to {display_name} at {normalized_number}. "
-        f"Opened mobile dialer on your device to make the call."
-    )
+    if bridge_result.get("recipients", 0) > 0:
+        return f"DISPATCHED: Sent the call to {display_name} at {normalized_number} to your connected device to dial."
+    return f"FAILED: No phone is connected (USB/ADB or the AgentTool app), so {display_name} at {normalized_number} was not called."
 
 @tool
 async def search_contacts(query: str) -> str:

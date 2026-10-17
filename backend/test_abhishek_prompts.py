@@ -35,7 +35,9 @@ async def run_tests():
     r1_confirm = await agent.chat("haan bhej do", session_id=session1)
     print(f"[Agent Confirmation Response]: {r1_confirm.get('reply')}")
     assert r1_confirm.get("confirmation_required") is False
-    assert "Sent WhatsApp message" in r1_confirm.get("reply", "") or "Executed" in r1_confirm.get("reply", "")
+    # The confirmation must execute the WhatsApp tool. Whether it was actually sent depends on a phone being
+    # connected, and the reply now reports that honestly instead of always claiming "Sent".
+    assert [t["tool"] for t in r1_confirm.get("tool_calls", [])] == ["send_whatsapp_message"]
     print(">>> PROMPT 1 CHECK 2 PASSED: WhatsApp message confirmed and sent!")
 
     # -----------------------------------------------------------------

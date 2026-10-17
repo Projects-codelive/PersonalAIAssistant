@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -8,8 +9,32 @@ logger = logging.getLogger(__name__)
 
 class Database:
     client: Optional[AsyncIOMotorClient] = None
-    db = None
     is_connected: bool = False
+    # Motor clients are bound to one event loop; the agent worker thread runs its own loop
+    # (app/agent/agent_worker.py), so each loop lazily gets its own client to the same database.
+    _loop_databases: Dict[Any, Any] = {}
+    _loop_clients: List[AsyncIOMotorClient] = []
+
+    @property
+    def db(self):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        database = self._loop_databases.get(loop)
+        if database is None and self.is_connected and loop is not None:
+            client = AsyncIOMotorClient(settings.MONGODB_URI, serverSelectionTimeoutMS=2500, connectTimeoutMS=2500)
+            self._loop_clients.append(client)
+            database = self._loop_databases[loop] = client[settings.MONGODB_DB_NAME]
+        return database
+
+    @db.setter
+    def db(self, database):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        self._loop_databases[loop] = database
     
     # Fallback in-memory storage if MongoDB is momentarily unreachable
     _memory_contacts: List[Dict[str, Any]] = [
@@ -61,6 +86,8 @@ async def close_mongo_connection():
     if db.client:
         logger.info("Closing MongoDB connection...")
         db.client.close()
+        for client in db._loop_clients:
+            client.close()
         db.is_connected = False
 
 # Database helper functions

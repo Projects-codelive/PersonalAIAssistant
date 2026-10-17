@@ -1,4 +1,5 @@
 import os
+import asyncio
 import base64
 import logging
 from contextlib import asynccontextmanager
@@ -16,6 +17,7 @@ from app.db.mongo import (
     get_contacts, add_contact, get_call_logs, log_call_event
 )
 from app.agent.gemma_agent import agent
+from app.agent.agent_worker import agent_worker
 from app.voice.elevenlabs_service import voice_service
 from app.device.device_bridge import device_bridge
 
@@ -110,7 +112,8 @@ async def chat_endpoint(payload: ChatRequest):
 
     # 1. Run Gemma Agent safely
     try:
-        result = await agent.chat(user_msg, session_id=payload.session_id)
+        # Runs on the agent worker thread: its blocking ADB/sleep calls must not freeze the server loop
+        result = await agent_worker.run(agent.chat, user_msg, session_id=payload.session_id)
         reply_text = result["reply"]
         tool_calls = result.get("tool_calls", [])
     except Exception as e:
@@ -129,28 +132,36 @@ async def chat_endpoint(payload: ChatRequest):
     # 2. Check if a call or message was initiated in the tool calls
     call_action = None
     message_action = None
+    # These describe what the tool already did on the phone (for the call HUD / status line).
+    # The device itself was driven exactly once by the tool, so clients must not re-dial or re-send.
     for tc in tool_calls:
         tool_name = tc.get("tool")
         res_str = str(tc.get("result", ""))
-        if tool_name == "make_phone_call" and "SUCCESS" in res_str:
+        outcome = res_str.split(":", 1)[0] if ":" in res_str else ""
+        if outcome not in ("SUCCESS", "NOT_CONFIRMED", "DISPATCHED"):
+            continue
+        if tool_name == "make_phone_call":
             import re
             num_match = re.search(r"at\s+([+\d\s-]{4,})", res_str)
             resolved_num = num_match.group(1).strip() if num_match else tc["args"].get("phone_number")
             call_action = {
                 "type": "CALL",
+                "status": outcome,
                 "phone_number": resolved_num,
                 "contact_name": tc["args"].get("contact_name")
             }
-        elif tool_name in ["send_whatsapp_message", "send_sms"] and "SUCCESS" in res_str:
+        elif tool_name in ["send_whatsapp_message", "send_sms"]:
             message_action = {
                 "type": "WHATSAPP" if "whatsapp" in tool_name else "SMS",
+                "status": outcome,
                 "phone_number": tc["args"].get("phone_number"),
                 "contact_name": tc["args"].get("contact_name"),
                 "message": tc["args"].get("message")
             }
-        elif tool_name == "send_email" and "SUCCESS" in res_str:
+        elif tool_name == "send_email":
             message_action = {
                 "type": "EMAIL",
+                "status": outcome,
                 "to_email": tc["args"].get("to_email"),
                 "contact_name": tc["args"].get("contact_name"),
                 "subject": tc["args"].get("subject"),
@@ -214,7 +225,7 @@ async def search_endpoint(payload: SearchRequest):
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     
     src = None if payload.source in ["auto", "", None] else payload.source
-    res = await search_knowledge_service.search_and_reframe(user_msg=q, query=q, explicit_source=src)
+    res = await agent_worker.run(search_knowledge_service.search_and_reframe, user_msg=q, query=q, explicit_source=src)
     return res
 
 @app.get("/api/contacts")
@@ -256,10 +267,14 @@ async def trigger_call_endpoint(payload: CallTriggerRequest):
 
     # Open mobile dialer on ADB physical device if connected
     from app.device.adb_controller import adb_controller
-    if adb_controller.is_device_connected:
-        adb_controller.open_mobile_dialer(target)
-
-    res = await device_bridge.trigger_call(target, payload.contact_name)
+    # One dispatch path only: the USB phone via ADB, otherwise the WebSocket device app
+    if await asyncio.to_thread(lambda: adb_controller.is_device_connected):
+        opened = await asyncio.to_thread(adb_controller.open_mobile_dialer, target)
+        res = {"status": "dialer_opened" if opened else "failed", "via": "adb"}
+    else:
+        res = await device_bridge.trigger_call(target, payload.contact_name)
+    if res.get("status") == "failed" or res.get("recipients") == 0:
+        return {"status": "error", "message": "No phone is connected to open the dialer.", "phone_number": target}
     await log_call_event(
         phone_number=target,
         contact_name=payload.contact_name or target,
@@ -288,10 +303,10 @@ async def get_live_screen_endpoint():
     If physical Android phone is connected via ADB, captures the REAL physical phone screen!
     """
     from app.device.adb_controller import adb_controller
-    if adb_controller.is_device_connected:
-        elements = adb_controller.dump_screen_hierarchy()
-        screenshot_b64 = adb_controller.take_screenshot_base64()
-        dev_info = adb_controller.get_device_info()
+    if await asyncio.to_thread(lambda: adb_controller.is_device_connected):
+        elements, screenshot_b64, dev_info = await asyncio.to_thread(
+            lambda: (adb_controller.dump_screen_hierarchy(), adb_controller.take_screenshot_base64(), adb_controller.get_device_info())
+        )
         return {
             "mode": "adb_live",
             "device": dev_info,
@@ -314,21 +329,21 @@ async def connect_adb_endpoint(payload: ADBConnectRequest):
     """Connect to Android phone over Wi-Fi (e.g. 192.168.1.6:5555) or detect USB"""
     from app.device.adb_controller import adb_controller
     if payload.ip_port:
-        success = adb_controller.connect_wifi(payload.ip_port)
-        return {"status": "success" if success else "failed", "device": adb_controller.get_device_info()}
-    dev = adb_controller.get_connected_device()
-    return {"status": "detected" if dev else "none", "device": adb_controller.get_device_info()}
+        success = await asyncio.to_thread(adb_controller.connect_wifi, payload.ip_port)
+        return {"status": "success" if success else "failed", "device": await asyncio.to_thread(adb_controller.get_device_info)}
+    dev = await asyncio.to_thread(adb_controller.get_connected_device)
+    return {"status": "detected" if dev else "none", "device": await asyncio.to_thread(adb_controller.get_device_info)}
 
 @app.post("/api/device/tap")
 async def tap_screen_endpoint(payload: ScreenTapRequest):
     """Click on live screen by text label or (x, y) coordinates"""
     from app.device.adb_controller import adb_controller
-    if adb_controller.is_device_connected:
+    if await asyncio.to_thread(lambda: adb_controller.is_device_connected):
         if payload.target:
-            success = adb_controller.click_element_by_text(payload.target)
+            success = await asyncio.to_thread(adb_controller.click_element_by_text, payload.target)
             return {"status": "success" if success else "not_found", "target": payload.target}
         elif payload.x is not None and payload.y is not None:
-            success = adb_controller.click_at(payload.x, payload.y)
+            success = await asyncio.to_thread(adb_controller.click_at, payload.x, payload.y)
             return {"status": "success" if success else "failed", "coords": [payload.x, payload.y]}
     # Fallback to websocket bridge
     await device_bridge.broadcast_action("SCREEN_TAP", {"target": payload.target or f"{payload.x},{payload.y}"})

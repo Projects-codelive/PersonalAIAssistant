@@ -322,9 +322,17 @@ async function sendMessage(text) {
     }
 
     // Trigger phone calling HUD if call action returned
+    // call_action / message_action report what the server already did on the phone (exactly once).
+    // Don't re-dial or re-send here: if this browser is the device, it receives a TRIGGER_* WebSocket event.
     if (data.call_action) {
-      setAgentState("executing", `Calling ${data.call_action.contact_name || data.call_action.phone_number}...`, "📞");
-      triggerMobilePhoneCall(data.call_action.phone_number, data.call_action.contact_name);
+      const ca = data.call_action;
+      const who = ca.contact_name || ca.phone_number;
+      if (ca.status === "SUCCESS") {
+        setAgentState("executing", `Calling ${who}...`, "📞");
+        triggerMobilePhoneCall(ca.phone_number, ca.contact_name, false);
+      } else {
+        setAgentState("idle", ca.status === "DISPATCHED" ? `Call to ${who} sent to your device` : `Tap Call on your phone for ${who}`, "📞");
+      }
     }
 
     // Trigger mobile messaging if message action returned
@@ -333,8 +341,9 @@ async function sendMessage(text) {
       const ch = ma.type === "WHATSAPP" ? "WhatsApp" : (ma.type === "EMAIL" ? "Email" : "SMS");
       const icon = ma.type === "EMAIL" ? "📧" : (ma.type === "WHATSAPP" ? "💬" : "✉️");
       const target = ma.to_email || ma.contact_name || ma.phone_number;
-      setAgentState("executing", `Sent ${ch} to ${target}`, icon);
-      triggerMobileMessage(data.message_action);
+      const label = ma.status === "SUCCESS" ? `Sent ${ch} to ${target}`
+        : (ma.status === "DISPATCHED" ? `${ch} for ${target} sent to your device` : `Check your phone: ${ch} to ${target} not confirmed`);
+      setAgentState("executing", label, icon);
     }
 
   } catch (err) {
@@ -756,7 +765,8 @@ async function uploadRecordedAudio() {
 // ========================================================
 // Automated Phone Call Execution & HUD
 // ========================================================
-function triggerMobilePhoneCall(phoneNumber, contactName) {
+// dial=false only shows the call HUD: used when the server already drove the phone for this call
+function triggerMobilePhoneCall(phoneNumber, contactName, dial = true) {
   if (!phoneNumber) {
     appendMessage("assistant", `⚠️ Cannot place call: No phone number specified for "${contactName || 'contact'}".`);
     return;
@@ -800,8 +810,8 @@ function triggerMobilePhoneCall(phoneNumber, contactName) {
   // AUTOMATED NATIVE PHONE CALL TRIGGER:
   // On real Android / iOS devices, setting window.location.href to "tel:..."
   // directly invokes the native device dialer with the number ready!
-  console.log(`[Auto-Call] Triggering native tel:${cleanNum}`);
-  setTimeout(() => {
+  if (dial) console.log(`[Auto-Call] Triggering native tel:${cleanNum}`);
+  if (dial) setTimeout(() => {
     try {
       window.location.href = `tel:${cleanNum}`;
     } catch (e) {

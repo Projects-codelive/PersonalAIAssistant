@@ -248,6 +248,22 @@ class UniversalMobileAgent:
             a, b = float(m_post_sub.group(1)), float(m_post_sub.group(2))
             return f"{m_post_sub.group(1)} - {m_post_sub.group(2)}", a - b
 
+        # 6b. Spoken infix operators: "25 multiplied by 4", "6 times 7", "10 divided by 2", "8 plus 2"
+        m_infix = re.search(
+            r"(\d+(?:\.\d+)?)\s+(plus|minus|times|into|multiplied\s+by|divided\s+by|over)\s+(\d+(?:\.\d+)?)",
+            t
+        )
+        if m_infix:
+            a, b = float(m_infix.group(1)), float(m_infix.group(3))
+            op_word = m_infix.group(2)
+            if op_word == "plus":
+                return f"{m_infix.group(1)} + {m_infix.group(3)}", a + b
+            if op_word == "minus":
+                return f"{m_infix.group(1)} - {m_infix.group(3)}", a - b
+            if op_word.startswith("divided") or op_word == "over":
+                return f"{m_infix.group(1)} / {m_infix.group(3)}", a / b if b != 0 else 0.0
+            return f"{m_infix.group(1)} * {m_infix.group(3)}", a * b
+
         # 7. Direct arithmetic expressions: "2 + 3", "25 * 4", "100 / 4"
         m_direct = re.search(r"(\d+(?:\.\d+)?)\s*([\+\-\*\/xX×÷])\s*(\d+(?:\.\d+)?)", t)
         if m_direct:

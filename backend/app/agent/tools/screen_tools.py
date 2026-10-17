@@ -75,7 +75,8 @@ async def open_app(app_name: str) -> str:
 
     # 1. Physical Device via ADB
     if adb_controller.is_device_connected:
-        adb_controller.open_app(app_name)
+        if not adb_controller.open_app(app_name):
+            return f"Error: Could not launch '{app_name}' on the device (app not found or not installed)."
         return f"Launched '{app_name}' application directly on physical mobile device via ADB."
 
     # 2. WebSocket Device Bridge

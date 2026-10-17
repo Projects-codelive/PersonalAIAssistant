@@ -353,10 +353,43 @@ class ADBDeviceController:
         "mcdonalds": "com.mcdonalds.mobileapp"
     }
 
+    # Equivalent packages on non-Samsung devices (Pixel / AOSP), tried when the mapped package is not installed
+    OEM_PACKAGE_ALTERNATIVES = {
+        "com.sec.android.app.popupcalculator": ["com.google.android.calculator", "com.android.calculator2"],
+        "com.sec.android.app.clockpackage": ["com.google.android.deskclock", "com.android.deskclock"],
+        "com.sec.android.gallery3d": ["com.google.android.apps.photos", "com.android.gallery3d"],
+        "com.sec.android.app.myfiles": ["com.google.android.apps.nbu.files", "com.google.android.documentsui"],
+        "com.samsung.android.app.notes": ["com.google.android.keep"],
+    }
+
+    def _list_installed_packages(self) -> set:
+        dev = self.get_connected_device()
+        if not dev:
+            return set()
+        try:
+            out = dev.shell("pm list packages")
+            return {line.split(":", 1)[1].strip() for line in out.splitlines() if line.startswith("package:")}
+        except Exception as e:
+            logger.warning(f"Error listing installed packages: {e}")
+            return set()
+
     def get_package_for_app_name(self, app_name: str) -> str:
-        """Map common app name to Android package name"""
+        """Map common app name to an Android package name installed on the connected device"""
         clean = app_name.strip().lower()
-        return self.APP_PACKAGE_MAP.get(clean, app_name)
+        pkg = self.APP_PACKAGE_MAP.get(clean, app_name)
+        installed = self._list_installed_packages()
+        if not installed or pkg in installed:
+            return pkg
+        for alt in self.OEM_PACKAGE_ALTERNATIVES.get(pkg, []):
+            if alt in installed:
+                return alt
+        # Fuzzy fallback: shortest installed package containing the app name (e.g. "calculator")
+        token = re.sub(r"[^a-z0-9]", "", clean)
+        if len(token) >= 4:
+            matches = sorted((p for p in installed if token in p.lower()), key=len)
+            if matches:
+                return matches[0]
+        return pkg
 
     def wake_screen(self) -> bool:
         """Wake up device screen and dismiss keyguard if asleep safely without triggering menu"""
@@ -381,8 +414,7 @@ class ADBDeviceController:
             return False
         pkg = self.get_package_for_app_name(package_or_name)
         try:
-            out = dev.shell(f"pm list packages {pkg}")
-            return f"package:{pkg}" in out
+            return pkg in self._list_installed_packages()
         except Exception as e:
             logger.warning(f"Error checking if {pkg} is installed: {e}")
             return False
@@ -393,6 +425,10 @@ class ADBDeviceController:
             return False
         self.wake_screen()
         pkg = self.get_package_for_app_name(package_or_name)
+        installed = self._list_installed_packages()
+        if installed and pkg not in installed:
+            logger.warning(f"App '{package_or_name}' (package {pkg}) is not installed on the device")
+            return False
         try:
             dev.app_start(pkg)
             return True
@@ -928,8 +964,8 @@ class ADBDeviceController:
                     dev.shell(f"input tap {cx} {cy}")
                     return True
 
-            logger.info("Dialer opened with number pre-dialed.")
-            return True
+            logger.warning("Dialer opened with number pre-dialed, but no Call button was found to tap.")
+            return False
         except Exception as e:
             logger.error(f"Error clicking call button: {e}")
             return False
@@ -975,8 +1011,8 @@ class ADBDeviceController:
             logger.info(f"Dispatching SMS intent via ADB to {clean_num}")
             dev.shell(cmd)
             time.sleep(0.8)
-            self.click_send_button()
-            return True
+            # True only if the Send button was found and tapped
+            return self.click_send_button()
         except Exception as e:
             logger.error(f"ADB SMS error: {e}")
             return False
@@ -998,8 +1034,8 @@ class ADBDeviceController:
             logger.info(f"Dispatching direct WhatsApp intent via ADB to {digits}")
             dev.shell(intent_cmd)
             time.sleep(1.2)
-            self.click_send_button()
-            return True
+            # True only if the Send button was found and tapped
+            return self.click_send_button()
         except Exception as e:
             logger.error(f"ADB WhatsApp error: {e}")
             return False
@@ -1082,8 +1118,8 @@ class ADBDeviceController:
             logger.info(f"Verified before sending Email: Subject filled = {verified_subject}, Content filled = {verified_body}")
 
             # Click send button
-            self.click_send_button()
-            return True
+            # True only if the Send button was found and tapped
+            return self.click_send_button()
         except Exception as e:
             logger.error(f"ADB Email error: {e}")
             return False
@@ -1120,8 +1156,8 @@ class ADBDeviceController:
                     dev.shell(f"input tap {cx} {cy}")
                     return True
 
-            logger.info("Composer opened with text pre-filled.")
-            return True
+            logger.warning("Composer opened with text pre-filled, but no Send button was found to tap.")
+            return False
         except Exception as e:
             logger.error(f"Error clicking send button: {e}")
             return False

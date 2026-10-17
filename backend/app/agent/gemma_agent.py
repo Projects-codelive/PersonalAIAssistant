@@ -995,7 +995,10 @@ Multilingual Instructions:
                 executed_tools.append({"tool": action, "args": tool_args, "result": tool_res})
                 display = pending.get("display_target") or tool_args.get("contact_name") or tool_args.get("phone_number") or tool_args.get("to_email")
 
-                if action == "make_phone_call":
+                # Only claim success when the tool confirmed it; otherwise relay what actually happened
+                if not tool_res.startswith("SUCCESS"):
+                    reply = tool_res.split(":", 1)[1].strip() if ":" in tool_res else tool_res
+                elif action == "make_phone_call":
                     reply = f"Calling {display} now on your mobile device."
                 elif action == "send_whatsapp_message":
                     reply = f"Sent WhatsApp message to {display}: \"{pending.get('message', '')}\"."
