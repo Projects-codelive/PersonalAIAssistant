@@ -514,6 +514,7 @@ class ADBDeviceController:
             "tab": "61",
             "delete": "67"
         }
+        key = str(key)  # callers pass names ("enter") or raw keycodes (66)
         keycode = key_map.get(key.lower(), key)
         try:
             dev.shell(["input", "keyevent", str(keycode)])

@@ -37,7 +37,11 @@ async def lifespan(app: FastAPI):
         adb_controller.setup_reverse_port(settings.PORT)
     except Exception as e:
         logger.debug(f"ADB reverse setup: {e}")
+    # Load Gemma in the background so startup isn't delayed and the first message is fast
+    from app.agent.gemma_agent import warm_up_model
+    warm_up_task = asyncio.create_task(warm_up_model())
     yield
+    warm_up_task.cancel()
     # Shutdown: Close DB
     await close_mongo_connection()
 

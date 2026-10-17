@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from typing import Dict, Any, Optional, List
@@ -258,9 +259,13 @@ Task:
         try:
             import ollama
             logger.info(f"Reframing findings with local Gemma ({settings.GEMMA_MODEL_NAME})...")
-            response = ollama.generate(
+            from app.agent.gemma_agent import OLLAMA_KEEP_ALIVE
+            response = await asyncio.to_thread(
+                ollama.Client(host=settings.OLLAMA_BASE_URL).generate,
                 model=settings.GEMMA_MODEL_NAME,
-                prompt=reframe_prompt
+                prompt=reframe_prompt,
+                think=False,
+                keep_alive=OLLAMA_KEEP_ALIVE,
             )
             ans = response.get("response", "").strip()
             if ans:
@@ -270,7 +275,7 @@ Task:
             try:
                 from langchain_ollama import ChatOllama
                 from langchain_core.messages import SystemMessage, HumanMessage
-                llm = ChatOllama(model=settings.GEMMA_MODEL_NAME, base_url=settings.OLLAMA_BASE_URL)
+                llm = ChatOllama(model=settings.GEMMA_MODEL_NAME, base_url=settings.OLLAMA_BASE_URL, reasoning=False)
                 resp = await llm.ainvoke([
                     SystemMessage(content="You are a helpful research assistant. Reframe and summarize the provided findings clearly."),
                     HumanMessage(content=reframe_prompt)

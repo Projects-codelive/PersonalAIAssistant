@@ -59,3 +59,17 @@ def test_open_app_launches_resolved_package(fake_phone):
     fake_phone.shell_output["pm list packages"] = PIXEL
     assert adb_controller.open_app("calculator") is True
     assert ["app_start", "com.google.android.calculator"] in fake_phone.commands
+
+
+def test_press_key_accepts_raw_keycodes(fake_phone):
+    adb_controller.press_key(66)          # the web-search flow passes an int
+    adb_controller.press_key("enter")
+    assert fake_phone.commands[-2:] == [["input", "keyevent", "66"], ["input", "keyevent", "66"]]
+
+
+@pytest.mark.parametrize("text", ["tell me a fun fact about cricket", "ask me anything", "tell us a joke"])
+async def test_questions_to_the_assistant_are_not_treated_as_messages(text, session_id):
+    from app.agent.gemma_agent import agent
+    result = await agent.run_hybrid_intent_analysis(text, session_id=session_id)
+    assert "Do you want to send a WhatsApp message, SMS, or Email" not in result.get("reply", "")
+    assert agent.pending_inputs.get(session_id) is None

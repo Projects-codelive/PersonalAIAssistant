@@ -76,6 +76,22 @@ CAPABILITIES & MOBILE ACTIONS:
 Be concise, helpful, and action-oriented. Always ask clarifying questions if details are missing, and ask for confirmation before executing tasks.
 """
 
+OLLAMA_KEEP_ALIVE = "30m"
+
+
+async def warm_up_model() -> None:
+    """Load Gemma into memory at startup so the first real message doesn't wait for the model to load"""
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            # An empty prompt makes Ollama load the model without generating anything
+            r = await client.post(f"{settings.OLLAMA_BASE_URL}/api/generate",
+                                  json={"model": settings.GEMMA_MODEL_NAME, "keep_alive": OLLAMA_KEEP_ALIVE})
+        logger.info(f"Gemma model '{settings.GEMMA_MODEL_NAME}' warmed up ({r.status_code})")
+    except Exception as e:
+        logger.warning(f"Could not warm up Gemma model: {e}")
+
+
 def create_local_gemma():
     """Initialize local Gemma via Ollama (No API Key Required)"""
     try:
@@ -84,7 +100,12 @@ def create_local_gemma():
         llm = ChatOllama(
             model=settings.GEMMA_MODEL_NAME,
             base_url=settings.OLLAMA_BASE_URL,
-            temperature=0.2
+            temperature=0.2,
+            # Intent extraction and short replies don't need chain-of-thought: with thinking on, a
+            # Gemma 4 call took ~11s vs ~0.4s off
+            reasoning=False,
+            # Keep the model in memory between messages (avoids a ~25s reload after Ollama's 5 min default)
+            keep_alive=OLLAMA_KEEP_ALIVE,
         )
         return llm
     except Exception as e:
@@ -1165,8 +1186,10 @@ Multilingual Instructions:
             ambig_target = m_ambig.group(1).strip()
             ambig_msg = m_ambig.group(2).strip()
 
-            # Ensure ambig_target is not a system keyword
-            if ambig_target.lower() not in ["whatsapp", "sms", "email", "message", "agent", "phone", "call"]:
+            # Ensure ambig_target is not a system keyword, or the user themself ("tell me a fun fact" is a
+            # question for the assistant, not a message to send)
+            if ambig_target.lower() not in ["whatsapp", "sms", "email", "message", "agent", "phone", "call",
+                                            "me", "us", "myself", "i", "mujhe", "humein", "hume", "hamein", "mere"]:
                 resolved = await self.resolve_target_contact(ambig_target)
                 if not resolved:
                     resolved = {"name": ambig_target, "phone": ambig_target, "status": "exact"}

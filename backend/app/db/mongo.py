@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -9,7 +10,28 @@ logger = logging.getLogger(__name__)
 
 class Database:
     client: Optional[AsyncIOMotorClient] = None
-    is_connected: bool = False
+    _connected: bool = False
+    # Circuit breaker: after a failed operation, skip MongoDB (in-memory fallback) for a while instead of
+    # making every request wait out the connection timeout; then try again.
+    RETRY_AFTER_SECONDS = 30
+    _unavailable_until: float = 0.0
+
+    @property
+    def is_connected(self) -> bool:
+        return self._connected and time.monotonic() >= self._unavailable_until
+
+    @is_connected.setter
+    def is_connected(self, value: bool):
+        self._connected = value
+        if value:
+            self._unavailable_until = 0.0
+
+    def mark_unavailable(self, error: Exception):
+        """Called when an operation fails: use the in-memory store for RETRY_AFTER_SECONDS"""
+        if time.monotonic() >= self._unavailable_until:
+            logger.warning(f"MongoDB unavailable ({type(error).__name__}); using in-memory store, "
+                           f"retrying in {self.RETRY_AFTER_SECONDS}s")
+        self._unavailable_until = time.monotonic() + self.RETRY_AFTER_SECONDS
     # Motor clients are bound to one event loop; the agent worker thread runs its own loop
     # (app/agent/agent_worker.py), so each loop lazily gets its own client to the same database.
     _loop_databases: Dict[Any, Any] = {}
@@ -110,7 +132,8 @@ async def get_contacts(search: Optional[str] = None) -> List[Dict[str, Any]]:
                 results.append(doc)
             return results
         except Exception as e:
-            logger.error(f"Error reading from MongoDB contacts: {e}")
+            logger.debug(f"Error reading from MongoDB contacts: {e}")
+            db.mark_unavailable(e)
 
     # Fallback search
     if search:
@@ -156,7 +179,8 @@ async def find_contact_by_name(name: str) -> Optional[Dict[str, Any]]:
                     doc["_id"] = str(doc["_id"])
                     return doc
         except Exception as e:
-            logger.error(f"MongoDB contact lookup error: {e}")
+            logger.debug(f"MongoDB contact lookup error: {e}")
+            db.mark_unavailable(e)
 
     # 5. Check connected phone via ADB if available
     try:
@@ -201,7 +225,8 @@ async def add_contact(name: str, phone: str, notes: str = "") -> Dict[str, Any]:
             new_contact["_id"] = str(result.inserted_id)
             return new_contact
         except Exception as e:
-            logger.error(f"Error inserting contact in MongoDB: {e}")
+            logger.debug(f"Error inserting contact in MongoDB: {e}")
+            db.mark_unavailable(e)
 
     new_contact["_id"] = f"mem_{len(db._memory_contacts) + 1}"
     db._memory_contacts.append(new_contact)
@@ -229,7 +254,8 @@ async def log_call_event(
             call_entry["_id"] = str(result.inserted_id)
             return call_entry
         except Exception as e:
-            logger.error(f"Error logging call in MongoDB: {e}")
+            logger.debug(f"Error logging call in MongoDB: {e}")
+            db.mark_unavailable(e)
 
     call_entry["_id"] = f"call_{len(db._memory_calls) + 1}"
     db._memory_calls.append(call_entry)
@@ -246,7 +272,8 @@ async def get_call_logs(limit: int = 50) -> List[Dict[str, Any]]:
                 logs.append(doc)
             return logs
         except Exception as e:
-            logger.error(f"Error fetching call logs from MongoDB: {e}")
+            logger.debug(f"Error fetching call logs from MongoDB: {e}")
+            db.mark_unavailable(e)
 
     return sorted(db._memory_calls, key=lambda x: x["timestamp"], reverse=True)[:limit]
 
@@ -264,7 +291,8 @@ async def save_conversation_turn(session_id: str, role: str, content: str, tool_
             await db.db.conversations.insert_one(turn)
             return
         except Exception as e:
-            logger.error(f"Error saving conversation turn: {e}")
+            logger.debug(f"Error saving conversation turn: {e}")
+            db.mark_unavailable(e)
 
     db._memory_conversations.append(turn)
 
@@ -283,6 +311,7 @@ async def get_recent_conversation_turns(session_id: str, limit: int = 30) -> Lis
                 })
             return turns[-limit:]
         except Exception as e:
-            logger.error(f"Error fetching conversation turns from MongoDB: {e}")
+            logger.debug(f"Error fetching conversation turns from MongoDB: {e}")
+            db.mark_unavailable(e)
     # Fallback to in-memory conversations
     return [t for t in db._memory_conversations if t.get("session_id") == session_id][-limit:]
