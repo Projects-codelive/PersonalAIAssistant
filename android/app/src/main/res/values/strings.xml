@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">AgentTool</string>
+    <string name="accessibility_service_label">AgentTool Screen &amp; Touch Assistant</string>
+    <string name="accessibility_service_description">Enables Gemma AI agent to autonomously observe screen elements, assist with calling contacts, and navigate apps.</string>
+</resources>
