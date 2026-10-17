@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- AgentTool theme tokens (same palette as the web client). Dark values live in values-night/colors.xml. -->
 <resources>
-    <color name="primary">#6366F1</color>
-    <color name="primary_dark">#4F46E5</color>
-    <color name="accent">#10B981</color>
-    <color name="background">#0F172A</color>
-    <color name="surface">#1E293B</color>
-    <color name="text_primary">#F8FAFC</color>
-    <color name="text_secondary">#94A3B8</color>
-    <color name="card_border">#334155</color>
+    <color name="color_background">#F8FAFC</color>
+    <color name="color_surface">#FFFFFF</color>
+    <color name="color_primary">#009FF5</color>
+    <color name="color_secondary">#EFF6FF</color>
+    <color name="color_accent">#3B82F6</color>
+    <color name="color_text">#1E293B</color>
+    <color name="color_text_secondary">#64748B</color>
+    <color name="color_border">#E2E8F0</color>
+    <color name="color_success">#10B981</color>
+    <color name="color_warning">#F59E0B</color>
+    <color name="color_error">#EF4444</color>
+    <color name="color_on_primary">#FFFFFF</color>
+    <color name="color_log_background">#F1F5F9</color>
 </resources>

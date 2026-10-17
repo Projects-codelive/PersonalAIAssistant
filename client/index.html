@@ -2,286 +2,308 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AgentTool - Autonomous Mobile Assistant</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#F8FAFC" id="meta-theme-color">
+  <title>AgentTool</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23009FF5'/><path d='M18 5 9 18h6l-1 9 9-13h-6z' fill='white'/></svg>">
   <link rel="stylesheet" href="/style.css">
   <link rel="manifest" href="/manifest.json">
+  <script>
+    // Apply the saved/system theme before first paint (no flash)
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("agenttool_theme"); } catch (e) {}
+      if (!t) t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
 </head>
 <body>
 
   <div class="app-container">
-    <!-- Top Header -->
+    <!-- Header -->
     <header class="app-header">
       <div class="brand">
-        <div class="brand-icon">⚡</div>
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M13.5 2 4 14h6.5L9.5 22 20 9.5h-6.6z"/></svg>
+        </div>
         <div class="brand-info">
           <h1>AgentTool</h1>
-          <span><span class="status-badge" id="system-status-dot"></span> Gemma • ElevenLabs Voice</span>
+          <span class="brand-sub"><span class="status-badge" id="system-status-dot"></span> Gemma · ElevenLabs</span>
         </div>
       </div>
       <div class="header-actions">
-        <select id="voice-lang-select" class="icon-btn" title="Voice Recognition Language" style="font-size: 0.72rem; padding: 4px 6px; border-radius: 8px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); color: #c7d2fe; cursor: pointer;">
-          <option value="en-IN" selected>🌐 Hinglish / Indian English</option>
-          <option value="hi-IN">🇮🇳 Hindi (हिन्दी)</option>
-          <option value="en-US">🇺🇸 English (US)</option>
-          <option value="es-ES">🇪🇸 Español</option>
-        </select>
-        <button class="icon-btn" id="continuous-voice-btn" title="Continuous Voice Assistant Mode (Always Ready like Google Assistant / Alexa)" onclick="toggleContinuousVoice()" style="font-size: 0.74rem; font-weight: 600; padding: 4px 10px; border-radius: 8px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399;">🎙️ Always Ready</button>
-        <a href="/AgentTool.apk" download="AgentTool.apk" class="icon-btn" style="text-decoration: none; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(99, 102, 241, 0.5); color: #a5b4fc; padding: 4px 10px; border-radius: 8px;" title="Download Android APK">📥 APK</a>
-        <button class="icon-btn" id="db-status-btn" title="MongoDB Status">🍃</button>
+        <button class="icon-btn" id="theme-toggle-btn" title="Switch light / dark theme" aria-label="Switch theme">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
         <button class="icon-btn" id="sound-toggle-btn" title="Voice Response Enabled">🔊</button>
+        <a class="icon-btn" href="/AgentTool.apk" download="AgentTool.apk" title="Download Android APK" aria-label="Download Android APK">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+        </a>
+        <button class="icon-btn" id="db-status-btn" title="MongoDB Status" aria-label="Database status">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+        </button>
       </div>
     </header>
 
-    <!-- Navigation Tabs -->
-    <nav class="nav-tabs">
+    <!-- Voice controls -->
+    <div class="voice-bar">
+      <label class="select-wrap" title="Voice Recognition Language">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        <select id="voice-lang-select">
+          <option value="en-IN" selected>Hinglish / Indian English</option>
+          <option value="hi-IN">Hindi (हिन्दी)</option>
+          <option value="en-US">English (US)</option>
+          <option value="es-ES">Español</option>
+        </select>
+      </label>
+      <button class="toggle-chip" id="continuous-voice-btn" title="Continuous Voice Assistant Mode (always listening between replies)" onclick="toggleContinuousVoice()">🎙️ Always Ready</button>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="nav-tabs" aria-label="Sections">
       <button class="tab-btn active" data-tab="tab-chat">
-        <span>💬</span> Assistant
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.8 7L3 21l2-6A8 8 0 1 1 21 12z"/></svg>
+        <span>Assistant</span>
       </button>
       <button class="tab-btn" data-tab="tab-tracker">
-        <span>📱</span> Screen Tracker
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>
+        <span>Screen</span>
       </button>
       <button class="tab-btn" data-tab="tab-contacts">
-        <span>👥</span> Contacts & Calls
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></svg>
+        <span>Contacts</span>
       </button>
       <button class="tab-btn" data-tab="tab-settings">
-        <span>⚙️</span> System
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        <span>System</span>
       </button>
     </nav>
 
-    <!-- Tab 1: Assistant & Voice Chat -->
+    <!-- Tab 1: Assistant -->
     <section class="tab-content active" id="tab-chat">
-      <!-- Quick Suggestion Chips -->
-      <div class="quick-prompts">
-        <button class="chip" onclick="sendQuickPrompt('Mom ko whatsapp bhejo ki main 10 minute me aa raha hu')">💬 Hindi: Mom ko whatsapp bhejo</button>
-        <button class="chip" onclick="sendQuickPrompt('Alice ko phone lagao')">📞 Hindi: Alice ko phone lagao</button>
-        <button class="chip" onclick="sendQuickPrompt('Hi Agent, send whatsapp to Alice saying Hello Alice testing automated messaging')">💬 WhatsApp: Alice</button>
-        <button class="chip" onclick="sendQuickPrompt('Send SMS to Mom saying Urgent: please check your email')">✉️ SMS: Mom</button>
-        <button class="chip" onclick="sendQuickPrompt('Send an email to alice@example.com with subject Project Alpha saying Hello Alice, testing automated email agent!')">📧 Email: alice@example.com</button>
-        <button class="chip" onclick="sendQuickPrompt('Maine abhi kisko message bheja tha?')">🕒 History: Kis ko message bheja?</button>
-        <button class="chip" onclick="sendQuickPrompt('Hi Agent')">🎙️ Say: 'Hi Agent'</button>
-        <button class="chip" onclick="importPhoneContacts()" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border-color: rgba(16, 185, 129, 0.3);">📱 Sync Contacts</button>
+      <div class="quick-prompts" aria-label="Suggestions">
+        <button class="chip" onclick="sendQuickPrompt('Hi Agent')">👋 Hi Agent</button>
+        <button class="chip" onclick="sendQuickPrompt('open calculator')">🧮 Open calculator</button>
+        <button class="chip" onclick="sendQuickPrompt('Alice ko phone lagao')">📞 Alice ko phone lagao</button>
+        <button class="chip" onclick="sendQuickPrompt('Mom ko whatsapp bhejo ki main 10 minute me aa raha hu')">💬 Mom ko WhatsApp</button>
+        <button class="chip" onclick="sendQuickPrompt('Send SMS to Mom saying Urgent: please check your email')">✉️ SMS to Mom</button>
+        <button class="chip" onclick="sendQuickPrompt('Send an email to alice@example.com with subject Project Alpha saying Hello Alice, testing automated email agent!')">📧 Email Alice</button>
+        <button class="chip" onclick="sendQuickPrompt('Maine abhi kisko message bheja tha?')">🕒 Kisko message bheja?</button>
+        <button class="chip chip-success" onclick="importPhoneContacts()">📱 Sync contacts</button>
       </div>
 
-      <!-- Chat Messages Container -->
       <div class="chat-container" id="chat-messages">
         <div class="message assistant">
-          Hello! I am your <strong>AgentTool</strong> autonomous mobile assistant powered by <strong>Gemma</strong> and <strong>ElevenLabs</strong>.<br><br>
-          You can talk to me with your voice or text. Ask me to <strong>call any contact</strong> (searches your contact list) or <strong>dial any phone number</strong> on your mobile dialer.
+          <div>Hi! I'm <strong>AgentTool</strong>, your on-device assistant powered by <strong>Gemma</strong>.<br><br>
+          Talk or type: I can <strong>call contacts</strong>, <strong>send WhatsApp, SMS or email</strong>, open apps and do calculations on your phone. I always ask before calling or sending.</div>
         </div>
       </div>
 
-      <!-- Input Area & Voice Mic -->
       <div class="input-area">
-        <input type="file" id="audio-file-input" accept="audio/*" capture="microphone" style="display: none;">
+        <input type="file" id="audio-file-input" accept="audio/*" capture="microphone" hidden>
         <div class="input-box-wrapper">
-          <input type="text" id="chat-input" class="chat-input" placeholder="Say 'Call Mom' or enter any phone number to dial..." />
-          <button class="send-btn" id="send-btn" title="Send text">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-          </button>
-          <button class="mic-btn" id="mic-btn" title="Hold or click to speak">
-            <svg id="mic-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-              <line x1="12" y1="19" x2="12" y2="23"></line>
-              <line x1="8" y1="23" x2="16" y2="23"></line>
-            </svg>
+          <input type="text" id="chat-input" class="chat-input" placeholder="Ask anything, e.g. “Call Mom”" autocomplete="off" />
+          <button class="send-btn" id="send-btn" title="Send" aria-label="Send">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>
           </button>
         </div>
+        <button class="mic-btn" id="mic-btn" title="Tap to speak" aria-label="Speak">
+          <svg id="mic-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
+        </button>
       </div>
     </section>
 
-    <!-- Tab 2: Screen Tracker & Device Automation View -->
+    <!-- Tab 2: Screen tracker -->
     <section class="tab-content" id="tab-tracker">
-      <div class="tracker-view">
-        <div class="section-title">
-          <span>Active Device Screen Inspection</span>
-          <button class="chip" onclick="refreshScreenTracker()">🔄 Inspect Now</button>
+      <div class="page">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3>Live device screen</h3>
+              <p class="muted">What the agent sees and taps</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="refreshScreenTracker()">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg>
+              Inspect
+            </button>
+          </div>
+
+          <div class="field-row">
+            <input type="text" id="adb-ip-input" class="field" placeholder="Phone IP:Port (e.g. 192.168.1.6:5555)">
+            <button class="btn btn-primary btn-sm" onclick="connectAdbDevice()">Connect</button>
+          </div>
+          <div id="adb-status-indicator" class="status-line">
+            <span>⚪ Mode: Web Simulator</span>
+          </div>
+
+          <div class="screen-canvas-card">
+            <img id="live-screen-img" src="" alt="Live Device Screen" class="live-screen" onclick="handleLiveScreenClick(event)">
+            <div class="simulated-mobile-screen" id="sim-screen">
+              <div class="coord-grid"></div>
+              <div class="sim-status-bar"><span>9:41</span><span>5G · 100%</span></div>
+              <div class="sim-heading">
+                <h4>Device screen</h4>
+                <p>Connect a phone to see it live</p>
+              </div>
+              <div class="sim-apps-grid">
+                <div class="sim-app-icon" id="sim-app-phone" onclick="simulateTap('Phone')"><div class="icon app-green">📞</div><span>Phone</span></div>
+                <div class="sim-app-icon" id="sim-app-contacts" onclick="simulateTap('Contacts')"><div class="icon app-blue">👥</div><span>Contacts</span></div>
+                <div class="sim-app-icon" id="sim-app-messages" onclick="simulateTap('Messages')"><div class="icon app-amber">💬</div><span>Messages</span></div>
+                <div class="sim-app-icon" id="sim-app-chrome" onclick="simulateTap('Chrome')"><div class="icon app-sky">🌐</div><span>Chrome</span></div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- ADB Wireless Connect Bar -->
-        <div style="display: flex; gap: 6px; margin-bottom: 6px;">
-          <input type="text" id="adb-ip-input" class="chat-input" placeholder="Phone IP:Port (e.g. 192.168.1.6:5555)" style="background: rgba(255,255,255,0.06); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 12px; flex: 1;">
-          <button class="chip" onclick="connectAdbDevice()" style="background: var(--primary); color: #fff; border-color: var(--primary);">⚡ Connect ADB</button>
-        </div>
-        <div id="adb-status-indicator" style="font-size: 11px; color: var(--accent-cyan); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-          <span>⚪ Mode: Web Simulator</span>
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3>Accessibility tree</h3>
+              <p class="muted">On-screen elements the agent can tap. Tap one to try it.</p>
+            </div>
+          </div>
+          <div class="element-tree-box" id="element-tree-box">
+            <div class="tree-node"><span class="tag">&lt;AppIcon&gt;</span> <span class="node-label">"Phone"</span> <span class="node-bounds">[50,800,150,900]</span></div>
+            <div class="tree-node"><span class="tag">&lt;AppIcon&gt;</span> <span class="node-label">"Contacts"</span> <span class="node-bounds">[170,800,270,900]</span></div>
+            <div class="tree-node"><span class="tag">&lt;AppIcon&gt;</span> <span class="node-label">"Messages"</span> <span class="node-bounds">[290,800,390,900]</span></div>
+            <div class="tree-node"><span class="tag">&lt;AppIcon&gt;</span> <span class="node-label">"Chrome"</span> <span class="node-bounds">[410,800,510,900]</span></div>
+          </div>
         </div>
 
-        <!-- Android Native APK Callout -->
-        <div style="display: flex; align-items: center; justify-content: space-between; background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(16, 185, 129, 0.15)); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; gap: 8px;">
+        <div class="card card-tint">
+          <h3>How it navigates</h3>
+          <ol class="steps">
+            <li><strong>Read</strong>: the Android accessibility service lists every button and label on screen.</li>
+            <li><strong>Decide</strong>: Gemma maps your request (“tap Phone”) to the exact element.</li>
+            <li><strong>Act</strong>: the agent taps it or opens the dialer, asking first before any call or message.</li>
+          </ol>
+        </div>
+
+        <a class="card apk-card" href="/AgentTool.apk" download="AgentTool.apk">
+          <div class="apk-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+          </div>
           <div>
-            <div style="font-weight: bold; color: #fff; font-size: 13px;">📲 Native Android Agent APK Ready</div>
-            <div style="font-size: 11px; color: #94a3b8;">Controls phone screen, taps nodes &amp; floats on all apps</div>
+            <h3>Android agent app</h3>
+            <p class="muted">Taps nodes and floats over every app</p>
           </div>
-          <a href="/AgentTool.apk" download="AgentTool.apk" style="background: var(--primary); color: #fff; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-size: 11px; font-weight: bold; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">📥 Get APK</a>
-        </div>
-
-        <!-- Screen Canvas Card (Shows Live Screen or Simulator) -->
-        <div class="screen-canvas-card">
-          <!-- Real Live Screen Screenshot (Visible when ADB phone connected) -->
-          <img id="live-screen-img" src="" alt="Live Device Screen" style="display: none; width: 100%; border-radius: var(--radius-sm); cursor: crosshair;" onclick="handleLiveScreenClick(event)">
-
-          <!-- Simulated Screen Canvas (Visible when in Web mode) -->
-          <div class="simulated-mobile-screen" id="sim-screen">
-            <div class="coord-grid"></div>
-            <div class="sim-status-bar">
-              <span>9:41</span>
-              <span>5G 📶 100% 🔋</span>
-            </div>
-            
-            <div style="text-align: center; margin-top: 30px; z-index: 1;">
-              <h3 style="font-size: 16px; color: #fff;">Device Screen View</h3>
-              <p style="font-size: 11px; color: #94a3b8;">Autonomous Navigation & Tracking Target</p>
-            </div>
-
-            <!-- Interactive App Icons -->
-            <div class="sim-apps-grid">
-              <div class="sim-app-icon" id="sim-app-phone" onclick="simulateTap('Phone')">
-                <div class="icon" style="background: #10b981;">📞</div>
-                <span>Phone</span>
-              </div>
-              <div class="sim-app-icon" id="sim-app-contacts" onclick="simulateTap('Contacts')">
-                <div class="icon" style="background: #3b82f6;">👥</div>
-                <span>Contacts</span>
-              </div>
-              <div class="sim-app-icon" id="sim-app-messages" onclick="simulateTap('Messages')">
-                <div class="icon" style="background: #f59e0b;">💬</div>
-                <span>Messages</span>
-              </div>
-              <div class="sim-app-icon" id="sim-app-chrome" onclick="simulateTap('Chrome')">
-                <div class="icon" style="background: #ec4899;">🌐</div>
-                <span>Chrome</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section-title">
-          <span>Accessibility UI Tree (Extracted Nodes)</span>
-        </div>
-        <div class="element-tree-box" id="element-tree-box">
-          <div class="tree-node"><span class="tag">&lt;AppIcon&gt;</span> label="Phone" id="phone_app" [50, 800, 150, 900]</div>
-          <div class="tree-node"><span class="tag">&lt;AppIcon&gt;</span> label="Contacts" id="contacts_app" [170, 800, 270, 900]</div>
-          <div class="tree-node"><span class="tag">&lt;AppIcon&gt;</span> label="Messages" id="messages_app" [290, 800, 390, 900]</div>
-          <div class="tree-node"><span class="tag">&lt;AppIcon&gt;</span> label="Chrome" id="browser_app" [410, 800, 510, 900]</div>
-        </div>
-
-        <!-- How Screen Navigation Works Explainer Card -->
-        <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-md); padding: 12px; font-size: 12px; line-height: 1.5;">
-          <strong style="color: var(--primary);">How Automatic Navigation Works:</strong><br>
-          1. <strong>Accessibility Tree Dump</strong>: Mobile service reads active UI elements using Android AccessibilityNodeInfo.<br>
-          2. <strong>Coordinate Mapping</strong>: Gemma maps natural intent ("tap phone") to exact bounding boxes.<br>
-          3. <strong>Autonomous Action</strong>: Dispatches click or Intent.ACTION_CALL directly to place calls and open apps without manual intervention.
-        </div>
+          <span class="btn btn-primary btn-sm">Get APK</span>
+        </a>
       </div>
     </section>
 
-    <!-- Tab 3: Contacts & Call History (MongoDB) -->
+    <!-- Tab 3: Contacts & calls -->
     <section class="tab-content" id="tab-contacts">
-      <div class="contacts-list">
-        <div class="section-title">
-          <span>MongoDB Contacts</span>
-          <div style="display: flex; gap: 6px;">
-            <button class="chip" onclick="importPhoneContacts()" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border-color: rgba(16, 185, 129, 0.3);">📱 Import From Phone</button>
-            <button class="chip" onclick="loadContacts()">🔄 Refresh</button>
+      <div class="page">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3>Contacts</h3>
+              <p class="muted">Saved in MongoDB</p>
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-secondary btn-sm" onclick="importPhoneContacts()">📱 Import</button>
+              <button class="btn btn-ghost btn-sm" onclick="loadContacts()" aria-label="Refresh contacts">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg>
+              </button>
+            </div>
           </div>
+
+          <div class="field-row">
+            <input type="text" id="new-contact-name" class="field" placeholder="Name">
+            <input type="tel" id="new-contact-phone" class="field" placeholder="Phone number">
+            <button class="btn btn-primary btn-icon" onclick="saveNewContactFromUI()" title="Add contact" aria-label="Add contact">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+
+          <div id="contacts-container" class="list"></div>
         </div>
 
-        <!-- Add Contact Mini-Form -->
-        <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-          <input type="text" id="new-contact-name" class="chat-input" placeholder="Name" style="background: rgba(255,255,255,0.06); padding: 8px 12px; border-radius: var(--radius-sm); width: 45%;">
-          <input type="text" id="new-contact-phone" class="chat-input" placeholder="Phone Number" style="background: rgba(255,255,255,0.06); padding: 8px 12px; border-radius: var(--radius-sm); width: 45%;">
-          <button class="icon-btn" onclick="saveNewContactFromUI()" title="Add Contact" style="background: var(--primary); color: white;">➕</button>
-        </div>
-
-        <div id="contacts-container" style="display: flex; flex-direction: column; gap: 8px;">
-          <!-- Dynamically populated from MongoDB -->
-        </div>
-
-        <div class="section-title" style="margin-top: 14px;">
-          <span>Recent Call Logs (MongoDB)</span>
-        </div>
-        <div id="call-logs-container" style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
-          <!-- Dynamically populated from MongoDB -->
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3>Recent activity</h3>
+              <p class="muted">Calls and messages the agent placed</p>
+            </div>
+          </div>
+          <div id="call-logs-container" class="list"></div>
         </div>
       </div>
     </section>
 
-    <!-- Tab 4: System & Configuration -->
+    <!-- Tab 4: System -->
     <section class="tab-content" id="tab-settings">
-      <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
-        <div class="section-title">
-          <span>System Diagnostics</span>
-        </div>
-        
-        <div class="contact-card">
-          <div class="contact-meta">
-            <h4>🍃 MongoDB Server</h4>
-            <p id="diag-mongo-status">Checking connection...</p>
+      <div class="page">
+        <div class="card">
+          <div class="card-head"><div><h3>System status</h3><p class="muted">Services the agent depends on</p></div></div>
+          <div class="list">
+            <div class="contact-card">
+              <div class="avatar avatar-success">🍃</div>
+              <div class="contact-meta">
+                <h4>MongoDB</h4>
+                <p id="diag-mongo-status">Checking connection…</p>
+              </div>
+              <span class="status-badge" id="diag-mongo-dot"></span>
+            </div>
+            <div class="contact-card">
+              <div class="avatar avatar-primary">🧠</div>
+              <div class="contact-meta">
+                <h4>Gemma (local LLM)</h4>
+                <p id="diag-gemma-status">Checking configuration…</p>
+              </div>
+              <span class="pill pill-primary">Active</span>
+            </div>
+            <div class="contact-card">
+              <div class="avatar avatar-accent">🎙️</div>
+              <div class="contact-meta">
+                <h4>ElevenLabs voice</h4>
+                <p id="diag-voice-status">Checking API key…</p>
+              </div>
+              <span class="pill pill-accent">Voice</span>
+            </div>
           </div>
-          <span class="status-badge" id="diag-mongo-dot"></span>
         </div>
 
-        <div class="contact-card">
-          <div class="contact-meta">
-            <h4>🧠 Gemma LLM Provider</h4>
-            <p id="diag-gemma-status">Checking configuration...</p>
-          </div>
-          <span style="font-size: 11px; color: var(--accent-cyan); font-weight: 600;">ACTIVE</span>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-meta">
-            <h4>🎙️ ElevenLabs Voice (TTS & STT)</h4>
-            <p id="diag-voice-status">Checking ElevenLabs API key...</p>
-          </div>
-          <span style="font-size: 11px; color: var(--accent-pink); font-weight: 600;">STATUS</span>
-        </div>
-
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; font-size: 12px; line-height: 1.6;">
-          <h4 style="font-size: 13px; margin-bottom: 6px; color: #fff;">How to Test On Mobile:</h4>
-          1. Connect your phone to the same Wi-Fi as your computer.<br>
-          2. Find your PC's IP address (shown in the backend terminal banner).<br>
-          3. Open <code>http://&lt;PC-IP&gt;:8000</code> in Chrome/Safari on your mobile device.<br>
-          4. Tap the Microphone button and say <strong>"Call Alice"</strong> or <strong>"Make a call to 911"</strong>.<br>
-          5. The phone call HUD will activate and launch the phone dialer!
+        <div class="card card-tint">
+          <h3>Use it from your phone</h3>
+          <ol class="steps">
+            <li><strong>USB</strong>: run <code>make phone</code>. The app connects automatically, no setup needed.</li>
+            <li><strong>Wi-Fi</strong>: open the <em>Wi-Fi Pairing Link</em> printed when the server starts, once on each device.</li>
+            <li><strong>WhatsApp</strong>: message the bot number. Send <code>help</code> to see what it can do.</li>
+          </ol>
         </div>
       </div>
     </section>
 
-    <!-- Active Phone Call HUD Modal -->
+    <!-- Active call HUD -->
     <div class="call-hud" id="call-hud">
-      <button class="icon-btn" onclick="endCurrentCall()" title="Close Call HUD" style="position: absolute; top: 18px; right: 18px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); font-size: 16px; color: #fff; z-index: 10;">✕</button>
+      <button class="hud-close" onclick="endCurrentCall()" title="Close" aria-label="Close call screen">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
       <div class="caller-info">
         <div class="caller-avatar" id="hud-avatar">👤</div>
         <h2 class="caller-name" id="hud-name">Alice Johnson</h2>
         <p class="caller-number" id="hud-number">+1 (555) 019-2834</p>
-        <p class="call-status" id="hud-status">Dialing...</p>
-        <p id="hud-timer" style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">00:00</p>
+        <p class="call-status" id="hud-status">Dialing…</p>
+        <p class="call-timer" id="hud-timer">00:00</p>
       </div>
-
-      <div style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+      <div class="hud-bottom">
         <div class="call-actions-grid">
           <button class="call-tool-btn" title="Mute">🎙️</button>
           <button class="call-tool-btn" title="Keypad">🔢</button>
           <button class="call-tool-btn" title="Speaker">🔊</button>
         </div>
-
-        <button class="end-call-btn" id="hud-end-call-btn" onclick="endCurrentCall()" title="End Call">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-6-6 19.8 19.8 0 0 1-3.12-8.68A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"></path>
-            <line x1="23" y1="1" x2="1" y2="23" stroke="#fff"></line>
-          </svg>
+        <button class="end-call-btn" id="hud-end-call-btn" onclick="endCurrentCall()" title="End call" aria-label="End call">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-1.6 0-3.2.3-4.6.8v3.1c0 .4-.2.7-.6.9-1 .5-1.8 1.1-2.6 1.8-.2.2-.4.3-.7.3s-.5-.1-.7-.3L.3 13.1c-.2-.2-.3-.4-.3-.7s.1-.5.3-.7C3.4 8.8 7.5 7 12 7s8.6 1.8 11.7 4.7c.2.2.3.4.3.7s-.1.5-.3.7l-2.5 2.5c-.2.2-.4.3-.7.3s-.5-.1-.7-.3c-.8-.7-1.7-1.3-2.6-1.8-.3-.2-.6-.5-.6-.9V9.8C15.2 9.3 13.6 9 12 9z"/></svg>
         </button>
+      </div>
     </div>
 
-    <!-- Floating Agent Widget (Dots & Muse style) -->
-    <div class="floating-agent-container" id="floating-agent" title="AgentTool Assistant • Tap to Talk or Interrupt">
+    <!-- Floating agent orb -->
+    <div class="floating-agent-container" id="floating-agent" title="AgentTool · tap to talk or interrupt">
       <div class="floating-agent-orb" id="floating-agent-orb" onclick="handleAgentOrbClick()">
         <div class="agent-glow-aura"></div>
         <div class="agent-ripple-ring ring-1"></div>

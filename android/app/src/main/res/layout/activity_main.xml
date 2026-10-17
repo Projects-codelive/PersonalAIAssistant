@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0F172A"
+    android:background="@color/color_background"
     android:fillViewport="true">
 
     <LinearLayout
@@ -24,7 +25,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="🤖 AgentTool"
-                android:textColor="#F8FAFC"
+                android:textColor="@color/color_text"
                 android:textSize="26sp"
                 android:textStyle="bold" />
 
@@ -33,9 +34,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="● Disconnected"
-                android:textColor="#EF4444"
+                android:textColor="@color/color_error"
                 android:textSize="13sp"
-                android:background="#1E293B"
+                android:background="@drawable/bg_pill"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
                 android:paddingTop="6dp"
@@ -47,7 +48,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Autonomous Mobile Agent bridge for Gemma LLM. Tracks screen elements &amp; navigates phone directly."
-            android:textColor="#94A3B8"
+            android:textColor="@color/color_text_secondary"
             android:textSize="14sp"
             android:layout_marginBottom="20dp" />
 
@@ -56,7 +57,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="#1E293B"
+            android:background="@drawable/bg_card"
             android:padding="16dp"
             android:layout_marginBottom="16dp">
 
@@ -64,7 +65,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Backend Server WebSocket"
-                android:textColor="#F8FAFC"
+                android:textColor="@color/color_text"
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="8dp" />
@@ -74,9 +75,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="ws://127.0.0.1:8000/ws/device/agent-mobile (USB)"
-                android:textColor="#F8FAFC"
-                android:textColorHint="#64748B"
-                android:background="#0F172A"
+                android:textColor="@color/color_text"
+                android:textColorHint="@color/color_text_secondary"
+                android:background="@drawable/bg_field"
                 android:padding="12dp"
                 android:textSize="14sp"
                 android:inputType="textUri"
@@ -86,9 +87,7 @@
                 android:id="@+id/btnConnect"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Connect to Gemma Agent"
-                android:backgroundTint="#6366F1"
-                android:textColor="#FFFFFF" />
+                android:text="Connect to Gemma Agent" />
         </LinearLayout>
 
         <!-- Permissions Card -->
@@ -96,7 +95,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="#1E293B"
+            android:background="@drawable/bg_card"
             android:padding="16dp"
             android:layout_marginBottom="16dp">
 
@@ -104,7 +103,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Required Permissions"
-                android:textColor="#F8FAFC"
+                android:textColor="@color/color_text"
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="12dp" />
@@ -123,7 +122,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="1. Accessibility Service (Screen Track)"
-                    android:textColor="#F8FAFC"
+                    android:textColor="@color/color_text"
                     android:textSize="13sp" />
 
                 <Button
@@ -131,7 +130,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Enable"
-                    android:backgroundTint="#3B82F6"
                     android:textSize="12sp" />
             </LinearLayout>
 
@@ -149,7 +147,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="2. Floating Overlay (Draw over apps)"
-                    android:textColor="#F8FAFC"
+                    android:textColor="@color/color_text"
                     android:textSize="13sp" />
 
                 <Button
@@ -157,7 +155,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Enable"
-                    android:backgroundTint="#3B82F6"
                     android:textSize="12sp" />
             </LinearLayout>
 
@@ -174,7 +171,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="3. Phone, Contacts &amp; Audio Permissions"
-                    android:textColor="#F8FAFC"
+                    android:textColor="@color/color_text"
                     android:textSize="13sp" />
 
                 <Button
@@ -182,7 +179,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Grant"
-                    android:backgroundTint="#3B82F6"
                     android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
@@ -192,7 +188,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="#1E293B"
+            android:background="@drawable/bg_card"
             android:padding="16dp"
             android:layout_marginBottom="16dp">
 
@@ -200,7 +196,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="📞 Phone Dialer &amp; Contact Search"
-                android:textColor="#F8FAFC"
+                android:textColor="@color/color_text"
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="6dp" />
@@ -209,7 +205,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Search your contact list or enter any number to open your mobile dialer."
-                android:textColor="#94A3B8"
+                android:textColor="@color/color_text_secondary"
                 android:textSize="12sp"
                 android:layout_marginBottom="10dp" />
 
@@ -218,9 +214,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Enter contact name or phone number..."
-                android:textColor="#F8FAFC"
-                android:textColorHint="#64748B"
-                android:background="#0F172A"
+                android:textColor="@color/color_text"
+                android:textColorHint="@color/color_text_secondary"
+                android:background="@drawable/bg_field"
                 android:padding="12dp"
                 android:textSize="14sp"
                 android:inputType="text"
@@ -237,18 +233,15 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="📞 Open Dialer"
-                    android:backgroundTint="#2563EB"
-                    android:textColor="#FFFFFF"
                     android:layout_marginEnd="6dp" />
 
                 <Button
+                style="@style/Widget.AgentTool.Button.Secondary"
                     android:id="@+id/btnSearchContact"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="🔍 Search Contact"
-                    android:backgroundTint="#6366F1"
-                    android:textColor="#FFFFFF"
                     android:layout_marginStart="6dp" />
             </LinearLayout>
         </LinearLayout>
@@ -258,7 +251,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="#1E293B"
+            android:background="@drawable/bg_card"
             android:padding="16dp"
             android:layout_marginBottom="16dp">
 
@@ -266,7 +259,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="🔎 Knowledge Tools &amp; Local Gemma"
-                android:textColor="#F8FAFC"
+                android:textColor="@color/color_text"
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="6dp" />
@@ -275,7 +268,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Calls Wikipedia, DuckDuckGo, arXiv, or PubMed without opening phone browser. Gemma reframes the extracted info."
-                android:textColor="#94A3B8"
+                android:textColor="@color/color_text_secondary"
                 android:textSize="12sp"
                 android:layout_marginBottom="10dp" />
 
@@ -283,7 +276,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Select Knowledge Tool Source:"
-                android:textColor="#CBD5E1"
+                android:textColor="@color/color_text_secondary"
                 android:textSize="12sp"
                 android:layout_marginBottom="4dp" />
 
@@ -291,7 +284,7 @@
                 android:id="@+id/spnKnowledgeSource"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="#0F172A"
+                android:background="@drawable/bg_field"
                 android:padding="10dp"
                 android:layout_marginBottom="10dp" />
 
@@ -300,9 +293,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Ask or search (e.g. how to on developer mode, machine learning)..."
-                android:textColor="#F8FAFC"
-                android:textColorHint="#64748B"
-                android:background="#0F172A"
+                android:textColor="@color/color_text"
+                android:textColorHint="@color/color_text_secondary"
+                android:background="@drawable/bg_field"
                 android:padding="12dp"
                 android:textSize="14sp"
                 android:inputType="text"
@@ -313,8 +306,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="⚡ Search Tool &amp; Reframe with Gemma"
-                android:backgroundTint="#059669"
-                android:textColor="#FFFFFF"
                 android:layout_marginBottom="12dp" />
 
             <!-- Search Details & Reframed Result -->
@@ -323,7 +314,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:background="#0F172A"
+                android:background="@drawable/bg_tint"
                 android:padding="12dp"
                 android:visibility="gone">
 
@@ -331,7 +322,7 @@
                     android:id="@+id/tvToolSiteStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="#38BDF8"
+                    android:textColor="@color/color_primary"
                     android:textSize="12sp"
                     android:textStyle="bold"
                     android:text="🛠️ Tool: -"
@@ -341,7 +332,7 @@
                     android:id="@+id/tvInfoTakenPreview"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="#94A3B8"
+                    android:textColor="@color/color_text_secondary"
                     android:textSize="11sp"
                     android:text="📄 Info Fetched: -"
                     android:layout_marginBottom="8dp" />
@@ -349,7 +340,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="#A7F3D0"
+                    android:textColor="@color/color_success"
                     android:textSize="12sp"
                     android:textStyle="bold"
                     android:text="🤖 Local Gemma Reframed Answer:"
@@ -359,7 +350,7 @@
                     android:id="@+id/tvReframedAnswer"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="#F1F5F9"
+                    android:textColor="@color/color_text"
                     android:textSize="13sp"
                     android:lineSpacingExtra="3dp"
                     android:text="Answer will appear here..." />
@@ -371,7 +362,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="#1E293B"
+            android:background="@drawable/bg_card"
             android:padding="16dp"
             android:layout_marginBottom="16dp">
 
@@ -379,7 +370,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Agent Actions"
-                android:textColor="#F8FAFC"
+                android:textColor="@color/color_text"
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="12dp" />
@@ -389,17 +380,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="🔮 Start Floating Agent Bubble"
-                android:backgroundTint="#10B981"
-                android:textColor="#FFFFFF"
                 android:layout_marginBottom="8dp" />
 
             <Button
+                style="@style/Widget.AgentTool.Button.Secondary"
                 android:id="@+id/btnTestDumpScreen"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="📋 Dump Screen UI Elements"
-                android:backgroundTint="#475569"
-                android:textColor="#FFFFFF" />
+                android:text="📋 Dump Screen UI Elements" />
         </LinearLayout>
 
         <!-- Logs Box -->
@@ -407,7 +395,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Agent Activity Log"
-            android:textColor="#94A3B8"
+            android:textColor="@color/color_text_secondary"
             android:textSize="13sp"
             android:layout_marginBottom="6dp" />
 
@@ -415,8 +403,8 @@
             android:id="@+id/tvLogs"
             android:layout_width="match_parent"
             android:layout_height="180dp"
-            android:background="#020617"
-            android:textColor="#38BDF8"
+            android:background="@drawable/bg_log"
+            android:textColor="@color/color_text_secondary"
             android:fontFamily="monospace"
             android:textSize="11sp"
             android:padding="12dp"

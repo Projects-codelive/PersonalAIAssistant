@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -34,6 +35,9 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity(), DeviceWebSocketClient.EventListener {
+
+    private fun themeColor(id: Int): Int = ContextCompat.getColor(this, id)
+
 
     private lateinit var tvConnectionStatus: TextView
     private lateinit var etServerUrl: EditText
@@ -135,14 +139,14 @@ class MainActivity : AppCompatActivity(), DeviceWebSocketClient.EventListener {
                 wsClient?.disconnect()
                 wsClient = null
                 btnConnect.text = "Connect to Gemma Agent"
-                btnConnect.setBackgroundColor(Color.parseColor("#6366F1"))
+                btnConnect.backgroundTintList = ColorStateList.valueOf(themeColor(R.color.color_primary))
                 tvConnectionStatus.text = "● Disconnected"
-                tvConnectionStatus.setTextColor(Color.parseColor("#EF4444"))
+                tvConnectionStatus.setTextColor(themeColor(R.color.color_error))
             } else {
                 wsClient = DeviceWebSocketClient(this, url, this)
                 wsClient?.connect()
                 btnConnect.text = "Disconnect"
-                btnConnect.setBackgroundColor(Color.parseColor("#EF4444"))
+                btnConnect.backgroundTintList = ColorStateList.valueOf(themeColor(R.color.color_error))
             }
         }
 
@@ -367,12 +371,12 @@ class MainActivity : AppCompatActivity(), DeviceWebSocketClient.EventListener {
     private fun updateStatusBadges() {
         val isA11y = isAccessibilityServiceEnabled(this, AgentAccessibilityService::class.java)
         tvAccessibilityStatus.text = if (isA11y) "1. Accessibility Service: ✓ Active" else "1. Accessibility Service: ✗ Disabled"
-        tvAccessibilityStatus.setTextColor(if (isA11y) Color.parseColor("#10B981") else Color.parseColor("#EF4444"))
+        tvAccessibilityStatus.setTextColor(if (isA11y) themeColor(R.color.color_success) else themeColor(R.color.color_error))
         btnEnableAccessibility.isEnabled = !isA11y
 
         val canDraw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(this) else true
         tvOverlayStatus.text = if (canDraw) "2. Floating Overlay: ✓ Granted" else "2. Floating Overlay: ✗ Missing"
-        tvOverlayStatus.setTextColor(if (canDraw) Color.parseColor("#10B981") else Color.parseColor("#EF4444"))
+        tvOverlayStatus.setTextColor(if (canDraw) themeColor(R.color.color_success) else themeColor(R.color.color_error))
         btnEnableOverlay.isEnabled = !canDraw
 
         val hasCall = ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
@@ -386,7 +390,7 @@ class MainActivity : AppCompatActivity(), DeviceWebSocketClient.EventListener {
         if (!hasMic) missing.add("Mic")
 
         tvPhoneStatus.text = if (permsOk) "3. Phone, Contacts & Audio: ✓ Granted" else "3. Missing: ${missing.joinToString(", ")}"
-        tvPhoneStatus.setTextColor(if (permsOk) Color.parseColor("#10B981") else Color.parseColor("#EF4444"))
+        tvPhoneStatus.setTextColor(if (permsOk) themeColor(R.color.color_success) else themeColor(R.color.color_error))
         btnGrantPermissions.isEnabled = !permsOk
     }
 
@@ -418,15 +422,15 @@ class MainActivity : AppCompatActivity(), DeviceWebSocketClient.EventListener {
 
     override fun onConnected() {
         tvConnectionStatus.text = "● Connected to Gemma"
-        tvConnectionStatus.setTextColor(Color.parseColor("#10B981"))
+        tvConnectionStatus.setTextColor(themeColor(R.color.color_success))
         log("✓ WebSocket link active!")
     }
 
     override fun onDisconnected(reason: String) {
         tvConnectionStatus.text = "● Disconnected"
-        tvConnectionStatus.setTextColor(Color.parseColor("#EF4444"))
+        tvConnectionStatus.setTextColor(themeColor(R.color.color_error))
         btnConnect.text = "Connect to Gemma Agent"
-        btnConnect.setBackgroundColor(Color.parseColor("#6366F1"))
+        btnConnect.backgroundTintList = ColorStateList.valueOf(themeColor(R.color.color_primary))
         log("Disconnected: $reason")
     }
 

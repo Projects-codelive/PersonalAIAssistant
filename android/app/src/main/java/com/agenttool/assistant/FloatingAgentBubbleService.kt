@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import androidx.core.content.ContextCompat
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -84,7 +85,7 @@ class FloatingAgentBubbleService : Service() {
         val frame = FrameLayout(this).apply {
             val bg = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#6366F1"))
+                setColor(ContextCompat.getColor(this@FloatingAgentBubbleService, R.color.color_primary))
                 setStroke(4, Color.parseColor("#FFFFFF"))
             }
             background = bg

@@ -1,9 +1,37 @@
 <resources>
     <style name="Theme.AgentTool" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/primary</item>
-        <item name="colorPrimaryVariant">@color/primary_dark</item>
-        <item name="colorSecondary">@color/accent</item>
-        <item name="android:statusBarColor">@color/background</item>
-        <item name="android:windowBackground">@color/background</item>
+        <item name="colorPrimary">@color/color_primary</item>
+        <item name="colorPrimaryVariant">@color/color_accent</item>
+        <item name="colorOnPrimary">@color/color_on_primary</item>
+        <item name="colorSecondary">@color/color_accent</item>
+        <item name="colorSurface">@color/color_surface</item>
+        <item name="colorOnSurface">@color/color_text</item>
+        <item name="colorError">@color/color_error</item>
+        <item name="android:colorBackground">@color/color_background</item>
+        <item name="android:windowBackground">@color/color_background</item>
+        <item name="android:statusBarColor">@color/color_background</item>
+        <item name="android:navigationBarColor">@color/color_background</item>
+        <!-- Dark status-bar icons on the light background (overridden in values-night) -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="materialButtonStyle">@style/Widget.AgentTool.Button</item>
+    </style>
+
+    <!-- Buttons: 12dp radius (radius-button), no all-caps, no elevation -->
+    <style name="Widget.AgentTool.Button" parent="Widget.MaterialComponents.Button.UnelevatedButton">
+        <item name="cornerRadius">12dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:insetTop">2dp</item>
+        <item name="android:insetBottom">2dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="backgroundTint">@color/color_primary</item>
+        <item name="android:textColor">@color/color_on_primary</item>
+    </style>
+
+    <!-- Secondary buttons: soft tint (color-secondary) with accent text -->
+    <style name="Widget.AgentTool.Button.Secondary">
+        <item name="backgroundTint">@color/color_secondary</item>
+        <item name="android:textColor">@color/color_accent</item>
     </style>
 </resources>

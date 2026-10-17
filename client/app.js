@@ -49,6 +49,7 @@ let socket = null;
 
 // Initialize on DOM Ready
 document.addEventListener("DOMContentLoaded", () => {
+  setupTheme();
   setupTabs();
   setupChatInputs();
   setupSpeechRecognition();
@@ -58,6 +59,32 @@ document.addEventListener("DOMContentLoaded", () => {
   loadContacts();
   loadCallLogs();
 });
+
+// ========================================================
+// Theme (light / dark): swaps html[data-theme]; colors come from CSS tokens
+// ========================================================
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const meta = document.getElementById("meta-theme-color");
+  if (meta) meta.setAttribute("content", getComputedStyle(document.documentElement).getPropertyValue("--color-background").trim());
+}
+
+function setupTheme() {
+  applyTheme(document.documentElement.getAttribute("data-theme") || "light");
+  const btn = document.getElementById("theme-toggle-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    applyTheme(next);
+    try { localStorage.setItem("agenttool_theme", next); } catch (e) {}
+  });
+}
+
+function setStatusDot(el, state) {
+  if (!el) return;
+  el.classList.remove("is-ok", "is-warn", "is-error");
+  el.classList.add(`is-${state}`);
+}
 
 // ========================================================
 // Tab Navigation
@@ -104,7 +131,7 @@ function setupWebSocket() {
 
     socket.onopen = () => {
       console.log("[WebSocket] Connected to AgentTool Device Bridge as", DEVICE_ID);
-      document.getElementById("system-status-dot").style.backgroundColor = "#10b981";
+      setStatusDot(document.getElementById("system-status-dot"), "ok");
     };
 
     socket.onmessage = (event) => {
@@ -119,7 +146,7 @@ function setupWebSocket() {
 
     socket.onclose = () => {
       console.warn("[WebSocket] Disconnected. Reconnecting in 3s...");
-      document.getElementById("system-status-dot").style.backgroundColor = "#f59e0b";
+      setStatusDot(document.getElementById("system-status-dot"), "warn");
       setTimeout(setupWebSocket, 3000);
     };
 
@@ -530,10 +557,8 @@ window.toggleContinuousVoice = function() {
   continuousVoice = !continuousVoice;
   const btn = document.getElementById("continuous-voice-btn");
   if (btn) {
-    btn.style.background = continuousVoice ? "linear-gradient(135deg, #10b981 0%, #059669 100%)" : "rgba(16, 185, 129, 0.15)";
-    btn.style.color = continuousVoice ? "#ffffff" : "#34d399";
-    btn.style.borderColor = continuousVoice ? "#10b981" : "rgba(16, 185, 129, 0.4)";
-    btn.textContent = continuousVoice ? "🎙️ Active (Always Ready)" : "🎙️ Always Ready";
+    btn.classList.toggle("is-active", continuousVoice);
+    btn.textContent = continuousVoice ? "🎙️ Listening mode on" : "🎙️ Always Ready";
   }
   if (continuousVoice && !isRecording && agentState !== "speaking") {
     startVoiceRecording();
@@ -897,7 +922,7 @@ async function connectAdbDevice() {
   const ipPort = ipInput ? ipInput.value.trim() : "";
   const statusEl = document.getElementById("adb-status-indicator");
 
-  statusEl.innerHTML = `<span>⏳ Connecting to device...</span>`;
+  statusEl.innerHTML = `<span>⏳ Connecting to device…</span>`;
 
   try {
     const res = await fetch(`${API_BASE}/api/device/connect-adb`, {
@@ -907,14 +932,14 @@ async function connectAdbDevice() {
     });
     const data = await res.json();
     if (data.device && data.device.connected) {
-      statusEl.innerHTML = `<span style="color: var(--success);">🟢 Physical Device Connected: ${data.device.model} (${data.device.device_id})</span>`;
+      statusEl.innerHTML = `<span class="ok">🟢 Connected: ${data.device.model} (${data.device.device_id})</span>`;
       appendMessage("assistant", `⚡ Connected to physical Android device: ${data.device.model}! Real screen tracking and autonomous navigation enabled.`);
       refreshScreenTracker();
     } else {
-      statusEl.innerHTML = `<span style="color: var(--danger);">🔴 No device detected. Connect via USB debugging or enter Wi-Fi IP:5555</span>`;
+      statusEl.innerHTML = `<span class="error">🔴 No device detected. Connect via USB debugging or enter Wi-Fi IP:5555</span>`;
     }
   } catch (err) {
-    statusEl.innerHTML = `<span style="color: var(--danger);">⚠️ Connection error: ${err.message}</span>`;
+    statusEl.innerHTML = `<span class="error">⚠️ Connection error: ${err.message}</span>`;
   }
 }
 
@@ -932,26 +957,26 @@ async function refreshScreenTracker() {
       liveImg.style.display = "block";
       simScreen.style.display = "none";
       if (statusEl && data.device) {
-        statusEl.innerHTML = `<span style="color: var(--success);">🟢 Live Physical Screen: ${data.device.model} (${data.device.device_id})</span>`;
+        statusEl.innerHTML = `<span class="ok">🟢 Live screen: ${data.device.model} (${data.device.device_id})</span>`;
       }
     } else {
       liveImg.style.display = "none";
       simScreen.style.display = "flex";
       if (statusEl) {
-        statusEl.innerHTML = `<span>⚪ Mode: Web Simulator (Connect via ADB to track real phone)</span>`;
+        statusEl.innerHTML = `<span>⚪ Simulator · connect a phone over USB or Wi-Fi to see it live</span>`;
       }
     }
 
     if (data.interactive_elements && data.interactive_elements.length > 0) {
       treeBox.innerHTML = data.interactive_elements.map(el => `
-        <div class="tree-node" style="cursor: pointer;" onclick="tapLiveElement('${el.label || el.text}')">
+        <div class="tree-node" onclick="tapLiveElement('${el.label || el.text}')">
           <span class="tag">&lt;${el.class || 'View'}&gt;</span>
-          <span style="color: #f8fafc;">"${el.label || el.text || el.id}"</span>
-          <span style="color: #64748b;">${el.bounds ? '[' + el.bounds.join(',') + ']' : ''}</span>
+          <span class="node-label">"${el.label || el.text || el.id}"</span>
+          <span class="node-bounds">${el.bounds ? '[' + el.bounds.join(',') + ']' : ''}</span>
         </div>
       `).join("");
     } else {
-      treeBox.innerHTML = `<p style="color: var(--text-dim); text-align: center;">No on-screen elements extracted yet.</p>`;
+      treeBox.innerHTML = `<p class="empty-state">No on-screen elements extracted yet.</p>`;
     }
   } catch (e) {
     console.error("Error fetching screen state:", e);
@@ -1007,11 +1032,12 @@ async function loadContacts() {
     const contacts = await res.json();
     const container = document.getElementById("contacts-container");
     if (!contacts || contacts.length === 0) {
-      container.innerHTML = `<p style="font-size: 12px; color: var(--text-dim); text-align: center;">No contacts found in MongoDB.</p>`;
+      container.innerHTML = `<p class="empty-state">No contacts yet. Add one above or import from your phone.</p>`;
       return;
     }
     container.innerHTML = contacts.map(c => `
       <div class="contact-card">
+        <div class="avatar">${escapeHtml((c.name || "?").trim().charAt(0).toUpperCase())}</div>
         <div class="contact-meta">
           <h4>${escapeHtml(c.name)}</h4>
           <p>${escapeHtml(c.phone)} ${c.notes ? '• ' + escapeHtml(c.notes) : ''}</p>
@@ -1060,16 +1086,18 @@ async function loadCallLogs() {
     const logs = await res.json();
     const container = document.getElementById("call-logs-container");
     if (!logs || logs.length === 0) {
-      container.innerHTML = `<p style="font-size: 12px; color: var(--text-dim); text-align: center;">No call logs in MongoDB yet.</p>`;
+      container.innerHTML = `<p class="empty-state">No calls or messages yet.</p>`;
       return;
     }
     container.innerHTML = logs.map(l => `
-      <div class="contact-card" style="padding: 10px 14px;">
-        <div>
-          <div style="font-weight: 600; color: #fff;">${escapeHtml(l.contact_name)} <span style="font-weight: 400; color: var(--text-muted);">(${escapeHtml(l.phone_number)})</span></div>
-          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">${new Date(l.timestamp).toLocaleTimeString()} • Initiated by: ${l.initiated_by}</div>
+      <div class="contact-card">
+        <div class="avatar avatar-primary">${/sms|whatsapp|email/i.test(l.status || "") ? "💬" : "📞"}</div>
+        <div class="contact-meta">
+          <h4>${escapeHtml(l.contact_name)}</h4>
+          <p>${escapeHtml(l.phone_number)}</p>
+          <p class="log-meta">${new Date(l.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${escapeHtml(String(l.initiated_by || ""))}</p>
         </div>
-        <span style="font-size: 11px; color: var(--success); font-weight: 600; text-transform: uppercase;">${l.status}</span>
+        <span class="pill ${/fail|error|not_confirmed/i.test(l.status || "") ? "pill-error" : "pill-success"}">${escapeHtml(String(l.status || "").split(":")[0].replace(/_/g, " "))}</span>
       </div>
     `).join("");
   } catch (e) {
@@ -1089,11 +1117,11 @@ async function checkSystemStatus() {
     const mongoStatus = document.getElementById("diag-mongo-status");
     const mongoDot = document.getElementById("diag-mongo-dot");
     if (data.mongodb.connected) {
-      mongoStatus.textContent = `Connected to ${data.mongodb.database} (${data.mongodb.uri})`;
-      mongoDot.style.backgroundColor = "#10b981";
+      mongoStatus.textContent = `Connected · database "${data.mongodb.database}"`;
+      setStatusDot(mongoDot, "ok");
     } else {
-      mongoStatus.textContent = `Offline / Fallback Memory Mode (${data.mongodb.uri})`;
-      mongoDot.style.backgroundColor = "#ef4444";
+      mongoStatus.textContent = "Offline · using in-memory store (history not saved)";
+      setStatusDot(mongoDot, "error");
     }
 
     // Gemma
