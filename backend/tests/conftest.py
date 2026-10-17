@@ -19,6 +19,14 @@ TEST_TOKEN = "test-token-123"
 os.environ["AGENTTOOL_API_TOKEN"] = TEST_TOKEN
 os.environ["BUILTIN_CONTACTS_FILE"] = str(BACKEND_DIR / "tests" / "no_builtin_contacts.json")
 os.environ["CORS_ORIGINS"] = ""
+# Fake WhatsApp settings so the real credentials in backend/.env are never used by tests
+os.environ.update({
+    "WHATSAPP_ACCESS_TOKEN": "test-wa-access-token",
+    "WHATSAPP_PHONE_NUMBER_ID": "100000000000001",
+    "WHATSAPP_APP_SECRET": "test-wa-app-secret",
+    "WHATSAPP_VERIFY_TOKEN": "test-wa-verify-token",
+    "WHATSAPP_ALLOWED_NUMBERS": "15550001111",
+})
 
 import adbutils._adb
 import pytest
@@ -30,6 +38,16 @@ def _no_real_adb(*args, **kwargs):
 
 # Tripwire: every adbutils call to the ADB server goes through make_connection
 adbutils._adb.BaseClient.make_connection = _no_real_adb
+
+import httpx  # noqa: E402
+
+
+async def _no_real_network(self, request, *args, **kwargs):
+    raise RuntimeError(f"Tests must never call external services ({request.url.host}). Fake the client instead.")
+
+
+# Tripwire: app code calls Meta (WhatsApp) and ElevenLabs through httpx.AsyncClient
+httpx.AsyncClient.send = _no_real_network
 
 from app.device.adb_controller import adb_controller, ADBDeviceController  # noqa: E402
 from app.device.device_bridge import device_bridge  # noqa: E402

@@ -33,6 +33,18 @@ class Settings(BaseSettings):
     # Extra browser origins allowed to call the API cross-origin (comma-separated). Same-origin always works.
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "")
 
+    # WhatsApp Cloud API (Meta): command the agent by WhatsApp text or voice note
+    WHATSAPP_ACCESS_TOKEN: str = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
+    WHATSAPP_PHONE_NUMBER_ID: str = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+    WHATSAPP_APP_SECRET: str = os.getenv("WHATSAPP_APP_SECRET", "")  # signs incoming webhooks
+    WHATSAPP_VERIFY_TOKEN: str = os.getenv("WHATSAPP_VERIFY_TOKEN", "")  # webhook subscription handshake
+    WHATSAPP_API_VERSION: str = os.getenv("WHATSAPP_API_VERSION", "v25.0")
+    # Comma-separated numbers (country code, digits only) allowed to command the agent and to receive replies
+    WHATSAPP_ALLOWED_NUMBERS: str = os.getenv("WHATSAPP_ALLOWED_NUMBERS", "")
+    # Who a WhatsApp command may call/SMS/WhatsApp from the phone (default: the allowed senders) and email
+    WHATSAPP_ALLOWED_TARGETS: str = os.getenv("WHATSAPP_ALLOWED_TARGETS", "")
+    WHATSAPP_ALLOWED_EMAILS: str = os.getenv("WHATSAPP_ALLOWED_EMAILS", "")
+
     class Config:
         env_file = ".env"
         extra = "allow"

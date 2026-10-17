@@ -100,6 +100,9 @@ class GemmaMobileAgent:
         self.pending_confirmations: Dict[str, Dict[str, Any]] = ExpiringDict(PENDING_ACTION_TTL_SECONDS)
         # In-memory conversational slot filling (missing parameters) keyed by session_id
         self.pending_inputs: Dict[str, Dict[str, Any]] = ExpiringDict(PENDING_ACTION_TTL_SECONDS)
+        # Optional policy hook (tool_name, args) -> refusal message or None; set by channels such as
+        # WhatsApp for the duration of one command (agent tasks are serialized on the agent worker)
+        self.action_guard = None
         
         if self.llm:
             try:
@@ -115,6 +118,10 @@ class GemmaMobileAgent:
         tool_func = self.tools_map.get(tool_name)
         if not tool_func:
             return f"Error: Tool '{tool_name}' not found."
+        refusal = self.action_guard(tool_name, args) if self.action_guard else None
+        if refusal:
+            logger.warning(f"Blocked tool {tool_name} by channel policy")
+            return f"BLOCKED: {refusal}"
         try:
             logger.info(f"Executing tool {tool_name} with args: {args}")
             if hasattr(tool_func, "ainvoke"):

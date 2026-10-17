@@ -21,6 +21,8 @@ from app.agent.agent_worker import agent_worker
 from app.voice.elevenlabs_service import voice_service
 from app.device.device_bridge import device_bridge
 from app.security import TokenAuthMiddleware
+from app.whatsapp.webhook import router as whatsapp_router
+from app.whatsapp.cloud_api import whatsapp_client
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("agenttool")
@@ -99,6 +101,10 @@ async def get_system_status():
         "elevenlabs": {
             "configured": voice_service.is_configured,
             "voice_id": settings.ELEVENLABS_VOICE_ID
+        },
+        "whatsapp": {
+            "configured": whatsapp_client.is_configured,
+            "allowed_numbers": len(whatsapp_client.allowed_numbers)
         },
         "connected_devices": len(device_bridge.active_connections)
     }
@@ -407,6 +413,9 @@ async def download_apk():
         media_type="application/vnd.android.package-archive",
         filename="AgentTool.apk"
     )
+
+# WhatsApp Cloud API webhook (signature-verified; must be registered before the static "/" mount)
+app.include_router(whatsapp_router)
 
 # Mount the static client files
 CLIENT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "client"))
