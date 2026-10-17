@@ -26,6 +26,9 @@ os.environ.update({
     "WHATSAPP_APP_SECRET": "test-wa-app-secret",
     "WHATSAPP_VERIFY_TOKEN": "test-wa-verify-token",
     "WHATSAPP_ALLOWED_NUMBERS": "15550001111",
+    # Explicitly strict (empty = only the allowed senders), whatever backend/.env says
+    "WHATSAPP_ALLOWED_TARGETS": "",
+    "WHATSAPP_ALLOWED_EMAILS": "",
 })
 
 import adbutils._adb

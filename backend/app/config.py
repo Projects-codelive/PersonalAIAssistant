@@ -41,7 +41,8 @@ class Settings(BaseSettings):
     WHATSAPP_API_VERSION: str = os.getenv("WHATSAPP_API_VERSION", "v25.0")
     # Comma-separated numbers (country code, digits only) allowed to command the agent and to receive replies
     WHATSAPP_ALLOWED_NUMBERS: str = os.getenv("WHATSAPP_ALLOWED_NUMBERS", "")
-    # Who a WhatsApp command may call/SMS/WhatsApp from the phone (default: the allowed senders) and email
+    # Who a WhatsApp command may call/SMS/WhatsApp from the phone (default: the allowed senders) and email.
+    # "*" allows anyone (the sender allowlist and the Yes/No confirmation still apply).
     WHATSAPP_ALLOWED_TARGETS: str = os.getenv("WHATSAPP_ALLOWED_TARGETS", "")
     WHATSAPP_ALLOWED_EMAILS: str = os.getenv("WHATSAPP_ALLOWED_EMAILS", "")
 

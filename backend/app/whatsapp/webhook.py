@@ -159,9 +159,12 @@ def target_refusal(tool_name: str, args: Dict[str, Any]) -> Optional[str]:
         return None
     if tool_name == "send_email":
         allowed_emails = {e.strip().lower() for e in settings.WHATSAPP_ALLOWED_EMAILS.split(",") if e.strip()}
-        if (args.get("to_email") or "").strip().lower() in allowed_emails:
+        if "*" in allowed_emails or (args.get("to_email") or "").strip().lower() in allowed_emails:
             return None
         return "For safety, email can't be sent from WhatsApp to that address."
+    # "*" = the allowlisted sender may call/message anyone (every action still needs their Yes)
+    if settings.WHATSAPP_ALLOWED_TARGETS.strip() == "*":
+        return None
     digits = normalize_number(args.get("phone_number", ""))
     if len(digits) >= 10 and digits[-10:] in _allowed_target_numbers():
         return None

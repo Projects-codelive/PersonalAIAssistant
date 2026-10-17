@@ -309,3 +309,29 @@ async def test_tool_guard_blocks_execution_of_disallowed_pending_action(monkeypa
     assert ran == []
     assert result["reply"].startswith("🔒 For safety")
     assert agent.action_guard is None  # policy only active during the WhatsApp command
+
+
+@pytest.mark.parametrize("tool, args", [
+    ("make_phone_call", {"phone_number": "+919167078537"}),
+    ("send_whatsapp_message", {"phone_number": "+44 20 7946 0958"}),
+    ("send_sms", {"phone_number": "911"}),
+])
+def test_wildcard_targets_allow_anyone(monkeypatch, tool, args):
+    monkeypatch.setattr(settings, "WHATSAPP_ALLOWED_TARGETS", "*")
+    assert webhook.target_refusal(tool, args) is None
+
+
+async def test_wildcard_offers_buttons_for_other_numbers(make_client, wa, monkeypatch):
+    monkeypatch.setattr(settings, "WHATSAPP_ALLOWED_TARGETS", "*")
+    wa["agent_result"] = {"reply": "Do you want to call Shyam (+919167078537)?", "tool_calls": [],
+                          "confirmation_required": True,
+                          "pending_action": {"action": "make_phone_call", "args": {"phone_number": "+919167078537"}}}
+    signed_post(make_client(), inbound(text_message("call shyam")))
+    await wa["run"]()
+    to, body, buttons = wa["sent"][0]
+    assert "Do you want to call Shyam" in body and buttons == ["confirm_yes", "confirm_no"]
+
+
+def test_wildcard_email(monkeypatch):
+    monkeypatch.setattr(settings, "WHATSAPP_ALLOWED_EMAILS", "*")
+    assert webhook.target_refusal("send_email", {"to_email": "anyone@example.com"}) is None
