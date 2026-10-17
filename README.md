@@ -2,6 +2,15 @@
 
 > **An autonomous mobile AI assistant powered by 100% Local Gemma (via Ollama), ElevenLabs voice (TTS & STT), LangChain tool calling, and MongoDB persistence. Zero Google API keys required.**
 
+## 🎬 Demo
+
+<p align="center">
+  <a href="demo/agenttool-demo.mp4">
+    <img src="demo/agenttool-demo.gif" alt="AgentTool demo: voice and WhatsApp commands controlling a real Android phone" width="720">
+  </a>
+</p>
+<p align="center"><sub>Silent preview (plays automatically). Click it for the full-quality video: <a href="demo/agenttool-demo.mp4">MP4, 2 min, no audio</a>.</sub></p>
+
 ---
 
 ## 🌟 Key Highlights

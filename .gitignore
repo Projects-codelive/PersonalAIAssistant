@@ -76,3 +76,6 @@ backend/builtin_contacts.json
 
 # One-command dev runner state (logs, install stamps)
 .dev/
+
+# Original demo recording with audio (the repo keeps the silent demo/agenttool-demo.*)
+demo/AgentTool_Demo.mp4
