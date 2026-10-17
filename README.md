@@ -78,6 +78,29 @@ AgentTool/
 
 ## 🚀 Quickstart & Testing Guide
 
+### macOS / Linux: one command
+
+Prerequisites: Python 3.11–3.13 (or [uv](https://docs.astral.sh/uv/)), Docker (for MongoDB), [Ollama](https://ollama.com) with a Gemma model, and for the phone: Android SDK platform-tools + USB debugging.
+
+```bash
+make dev      # set up anything missing, then start the server
+make phone    # same, plus build + install + launch the Android app on the USB phone
+make test     # offline test suite (~2 s)
+make stop     # stop the MongoDB container
+```
+
+`make dev` creates `backend/.venv` and installs dependencies (only when requirements change), starts MongoDB in a Docker container `agenttool-mongo` (data kept in a volume), picks your configured Gemma model or the smallest installed Gemma with tool calling, picks a free port, and maps the phone's port 8000 to it over USB, so the app's default URL works unchanged. Overrides: `PORT=9000 make dev`, `GEMMA_MODEL_NAME=gemma4:e4b-mlx make dev`, `ANDROID_SERIAL=<id>` for a specific phone.
+
+Over USB the phone needs no token. From another device on Wi-Fi, open the **Wi-Fi Pairing Link** printed at startup once, or paste the printed `ws://…?token=…` URL into the Android app.
+
+### Tests
+
+`make test` runs `backend/tests` with pytest. It is fully offline and safe to run with a phone plugged in: ADB access is blocked (any attempt fails the test), the LLM is disabled, and MongoDB is not used. It covers API/WebSocket auth, confirmation gating and expiry, honest call/message results with single dispatch, shell quoting of user text, math parsing, app resolution across phone brands, and the agent worker thread.
+
+> ⚠️ The older `backend/test_*.py` files are **live scenario scripts**, not unit tests: with a phone connected they place real calls and send real WhatsApp/SMS/email to the numbers inside them. pytest never collects them. Run one only deliberately: `cd backend && .venv/bin/python test_<name>.py`.
+
+### Windows
+
 ### Step 1: Start the AgentTool Server
 
 In PowerShell:
